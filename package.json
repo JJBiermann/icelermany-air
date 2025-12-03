@@ -1,5 +1,5 @@
 {
-  "name": "icelermany-air",
+  "name": "typed-computer-graphics",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,12 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/node": "^24.10.0",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "@webgpu/types": "^0.1.66",
+    "vite-raw-plugin": "^1.0.2"
   }
 }
