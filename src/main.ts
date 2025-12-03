@@ -1,5 +1,4 @@
-import { sizeof } from "./utils/MV";
-import shader from "./shader/shaders.wgsl";
+import shaderOne from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
 import { scalem, flatten, lookAt, vec3, perspective, mult, translate } from "./utils/MV";
@@ -9,7 +8,7 @@ window.onload = (_) => {main();};
 
 async function main() {
     const renderer: Renderer = new Renderer({
-        shaderCode: shader,
+        shaderCode: shaderOne,
         is3DRenderer: true,
         uniformBufferSize: 240,
         useBindGroup: true,
@@ -19,14 +18,6 @@ async function main() {
     });
 
     await renderer.init();
-
-    // Create identity matrices for model, view, and projection
-    const identity = [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    ];
 
          // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
     var eye = vec3(0, 0, 2);      // eye is a point
