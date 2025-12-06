@@ -1,11 +1,8 @@
-import { sizeof } from './utils/MV';
+import { flatten, sizeof, type Mat } from './utils/MV';
+import { RenderNode } from './node';
 
 interface RendererConfig {
     msaaCount?: number;
-    useColorBuffer?: boolean;
-    useIndicesBuffer?: boolean;
-    useUniformBuffer?: boolean;
-    useBindGroup?: boolean;
     uniformBufferSize?: number;
     backgroundColor?: GPUColor;
     pipelinePrimitive?: GPUPrimitiveState;
@@ -15,9 +12,6 @@ interface RendererConfig {
 
 }
 
-
-// TODO: Smart reallocation of buffers, when increased / decreased.
-// TODO: only build in non null values for buffers, if they are really needed.
 export class Renderer {
     private positionBuffer!: GPUBuffer;
     private colorBuffer!: GPUBuffer;
@@ -43,12 +37,8 @@ export class Renderer {
 
     constructor(config: RendererConfig) {
         this.config = {
-            useColorBuffer: true,
-            useIndicesBuffer: true,
             msaaCount: 1,
             backgroundColor: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
-            useUniformBuffer: true,
-            useBindGroup: true,
             uniformBufferSize: 150,
             pipelinePrimitive: {
                 topology: 'triangle-list',
@@ -88,9 +78,7 @@ export class Renderer {
         );
 
         this.createBuffers();
-        if (this.config.useBindGroup) {
-            this.createBindGroups();
-        }
+        this.createBindGroups();
         this.createTextures();
     }
 
@@ -165,28 +153,71 @@ export class Renderer {
 
         pass.setPipeline(this.pipeline);
 
-        if (this.config.useBindGroup && this.bindGroup) {
-            pass.setBindGroup(0, this.bindGroup);
-        }
+        pass.setBindGroup(0, this.bindGroup);
 
         pass.setVertexBuffer(0, this.positionBuffer);
+        pass.setVertexBuffer(1, this.colorBuffer);
+        pass.setVertexBuffer(2, this.normalBuffer);
 
-        if (this.config.useColorBuffer && this.colorBuffer) {
-            pass.setVertexBuffer(1, this.colorBuffer);
-        }
-
-        pass.setVertexBuffer(2, this.normalBuffer); 
-
-        if (this.config.useIndicesBuffer && this.indicesBuffer) {
-            pass.setIndexBuffer(this.indicesBuffer, 'uint32');
-            pass.drawIndexed(indicesLength, 1);
-        } else {
+        pass.setIndexBuffer(this.indicesBuffer, 'uint32');
+        pass.drawIndexed(indicesLength, 1);
+        /*else {
             const vertexCount = Math.floor(this.currentVertexCapacity); // TODO: Reevaluate, whether this makes sense.
             pass.draw(vertexCount, 1);
-        } 
+        }*/
 
         pass.end();
         this.device.queue.submit([encoder.finish()])
+    }
+
+    public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat) {
+        const encoder = this.device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                view: this.context.getCurrentTexture().createView(),
+                loadOp: 'clear',
+                storeOp: 'store',
+                clearValue: this.config.backgroundColor,
+            }],
+            depthStencilAttachment: {
+                view: this.depthTexture.createView(),
+                depthLoadOp: "clear",
+                depthClearValue: 1.0,
+                depthStoreOp: "store",
+            }
+        });
+
+        // inside every node, there has to be a custom render function for that node.
+        pass.setPipeline(this.pipeline);
+        pass.setBindGroup(0, this.bindGroup);
+        rootNode.traverse(pass, model, view, proj);
+        console.log("Reached traverse end.")
+        pass.end()
+        this.device.queue.submit([encoder.finish()]);
+    }
+
+    // this function will be called inside of the "traverse()" function of the corresponding node.
+    public renderNode(node: RenderNode, pass: GPURenderPassEncoder, model: Mat,  view: Mat, proj: Mat) {
+        if (node == null) {
+            throw new Error("WTF is happening lol");
+        }
+        console.log("view: ", view);
+        console.log("proj: ", proj);
+        // update the model matrix of the uniform buffer
+        console.log("drawing node with model:", Array.from(flatten(model)));
+        let uniform : number[] = [...Array.from(flatten(model)), ...Array.from(flatten(view)), ...Array.from(flatten(proj))]
+        this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(uniform));
+        // update position buffer --> NOTE: rethink if this is the best way to approach this.
+        //this.device.queue.writeBuffer(this.positionBuffer, 0, new Float32Array(node.vertices));
+        // update the indices buffer --> NOTE: same as above
+        //this.device.queue.writeBuffer(this.indicesBuffer, 0, new Uint32Array(node.indices));
+
+      
+        pass.setVertexBuffer(0, this.positionBuffer, node.vertexOffset);
+        pass.setIndexBuffer(this.indicesBuffer, 'uint32', node.indexOffset);
+        //pass.setVertexBuffer(1, this.colorBuffer);
+        //pass.setVertexBuffer(2, this.normalBuffer);
+        pass.drawIndexed(node.indexCount, 1);
     }
 
     private async initGpuHandle() {
@@ -236,7 +267,7 @@ export class Renderer {
             vertex: {
                 module: this.wgsl,
                 entryPoint: 'main_vs',
-                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout],
+                buffers: [this.positionBufferLayout]//, this.colorBufferLayout, this.normalBufferLayout],
             },
             fragment: {
                 module: this.wgsl,
@@ -256,107 +287,66 @@ export class Renderer {
     }
 
     private configureVertexBufferLayouts() {
-        if (this.config.is3DRenderer) {
-            this.positionBufferLayout = {
-                arrayStride: 16, // sizeof vec4 (4 * 4 bytes) - positions stored as vec4 in OBJParser
-                attributes: [{
-                    format: 'float32x3',
-                    offset: 0,
-                    shaderLocation: 0, // Position, see vertex shader
-                }],
-            };
-        } else {
-            this.positionBufferLayout = {
-                arrayStride: sizeof['vec2'], // sizeof vec3 (3 * 4 bytes)
-                attributes: [{
-                    format: 'float32x2',
-                    offset: 0,
-                    shaderLocation: 0, // Position, see vertex shader
-                }],
-            };
-        }
 
-        if (this.config.useColorBuffer) {
-            this.colorBufferLayout = {
-                arrayStride: 16, // sizeof vec4 (4 * 4 bytes)
-                attributes: [{
-                    format: 'float32x4',
-                    offset: 0,
-                    shaderLocation: 1,
-                }]
-            };
-        }
+        this.positionBufferLayout = {
+            arrayStride: 12, // sizeof vec4 (4 * 4 bytes) - positions stored as vec4 in OBJParser
+            attributes: [{
+                format: 'float32x3',
+                offset: 0,
+                shaderLocation: 0, // Position, see vertex shader
+            }],
+        };
 
-        this.normalBufferLayout = {
-            arrayStride: 16, 
+        /*
+        this.colorBufferLayout = {
+            arrayStride: 16, // sizeof vec4 (4 * 4 bytes)
             attributes: [{
                 format: 'float32x4',
-                offset: 0, 
+                offset: 0,
+                shaderLocation: 1,
+            }]
+        };
+
+        this.normalBufferLayout = {
+            arrayStride: 16,
+            attributes: [{
+                format: 'float32x4',
+                offset: 0,
                 shaderLocation: 2,
             }]
         }
+            */
     }
 
     private createBuffers() {
-        const positionBufferSize = this.config.is3DRenderer ? 
-            this.currentVertexCapacity * sizeof['vec3'] : 
+        const positionBufferSize = this.config.is3DRenderer ?
+            this.currentVertexCapacity * sizeof['vec3'] :
             this.currentVertexCapacity * sizeof['vec2'];
-            
+
         this.positionBuffer = this.device.createBuffer({
             size: positionBufferSize,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
         this.normalBuffer = this.device.createBuffer({
-            size: positionBufferSize, 
+            size: positionBufferSize,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
-        if (this.config.useColorBuffer) {
-            this.colorBuffer = this.device.createBuffer({
-                size: this.currentVertexCapacity * sizeof['vec4'],
-                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            });
-        }
-        
-        if (this.config.useIndicesBuffer) {
-            this.indicesBuffer = this.device.createBuffer({
-                size: this.currentIndexCapacity * 4, // 4 bytes per uint32
-                usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-            });
-        }
-
-        if (this.config.useUniformBuffer) {
-            this.uniformBuffer = this.device.createBuffer({
-                size: this.config.uniformBufferSize!,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-        }
-        /*
-        this.positionBuffer = this.device.createBuffer({
-            size: this.config.maxVertices! * 12, // sizeof vec3
+        this.colorBuffer = this.device.createBuffer({
+            size: this.currentVertexCapacity * sizeof['vec4'],
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
-        if (this.config.useColorBuffer) {
-            this.colorBuffer = this.device.createBuffer({
-                size: this.config.maxVertices! * 16, // sizeof vec4
-                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            });
-        }
-        if (this.config.useIndicesBuffer) {
-            this.indicesBuffer = this.device.createBuffer({
-                size: this.config.maxVertices! * 3 * 4, // 3 indices per triangle * 4 bytes per uint32
-                usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-            });
-        }
+        this.indicesBuffer = this.device.createBuffer({
+            size: this.currentIndexCapacity * 4, // 4 bytes per uint32
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
 
-        if (this.config.useUniformBuffer) {
-            this.uniformBuffer = this.device.createBuffer({
-                size: this.config.uniformBufferSize!, //2 * 64 + 2 * 12 + 5 * 4 + 2 * 2, // 2 * sizeof mat4 + 2 * sizeof vec3 + 5 * 4 + 2 * 2
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-        }*/
+        this.uniformBuffer = this.device.createBuffer({
+            size: this.config.uniformBufferSize!,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
     }
 
     private createBindGroups() {
@@ -396,12 +386,10 @@ export class Renderer {
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
 
-        if (this.config.useColorBuffer) {
-            this.colorBuffer = this.device.createBuffer({
-                size: newCapacity * sizeof['vec4'],
-                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            });
-        }
+        this.colorBuffer = this.device.createBuffer({
+            size: newCapacity * sizeof['vec4'],
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
 
         this.currentVertexCapacity = newCapacity;
 
@@ -409,19 +397,17 @@ export class Renderer {
         oldColorBuffer?.destroy();
 
         //Recreate bind groups if they reference the buffers
-        if (this.config.useBindGroup) {
-            this.createBindGroups();
-        }
+        this.createBindGroups();
     }
 
     private resizeIndexBuffer(requiredIndices: number): void {
         const newCapacity = Math.ceil(requiredIndices * 2);
-        
+
         console.log(`Resizing index buffer from ${this.currentIndexCapacity} to ${newCapacity} indices`);
-        
+
         // Store old buffer
         const oldIndexBuffer = this.indicesBuffer;
-        
+
         // Create new index buffer
         this.indicesBuffer = this.device.createBuffer({
             size: newCapacity * 4, // 4 bytes per uint32
@@ -430,12 +416,16 @@ export class Renderer {
 
         // Update capacity
         this.currentIndexCapacity = newCapacity;
-        
+
         // Destroy old buffer
         oldIndexBuffer?.destroy();
     }
-    
+
     private fail(msg: string) {
         document.body.innerHTML = `<h1>${msg}</h1>`
+    }
+
+    public getDevice(): GPUDevice {
+        return this.device;
     }
 }
