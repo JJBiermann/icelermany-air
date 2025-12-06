@@ -1,0 +1,12 @@
+# Blender 4.5.4 LTS MTL File: 'Icelermany_airplane.blend'
+# www.blender.org
+
+newmtl Head
+Ns 250.000000
+Ka 0.770000 0.770000 0.770000
+Kd 0.639112 0.677074 0.677074
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
