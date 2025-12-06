@@ -55,7 +55,8 @@ async function main() {
     const rightElevatorTransform = vec3(-1.0459, 0.047272, -4.0859);
     const rudderTransform = vec3(0.009496, 0.59494, -4.2548);
     
-    let modelMatrix = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]),mult(rotateX(90), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2]))); //translate(-2.0116, 0.042162, +0.54629))
+    let modelMatrix = mult(translate(0, 0, 0), scalem(0.25, 0.25, 0.25));
+    //let modelMatrix = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]),mult(rotateX(0), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2]))); //translate(-2.0116, 0.042162, +0.54629))
     // Pinhole camera with 45° vertical FOV
     const fovy = 45;       // degrees (MV.js-style perspective usually expects degrees)
     const near = 0.1;
@@ -91,7 +92,7 @@ async function main() {
     renderer.updateUniformBuffer(Array.from(uniformData));
 
     // Load OBJ file
-    const objData = await readOBJFile("../../../blender-models/deadcenter.obj", 1);
+    const objData = await readOBJFile("../../../blender-models/plane-parts/planebody.obj", 1);
     //const objData = await readOBJFile("../../../blender-models/rudder.obj", 1);
     console.log(objData);
     console.log(objData?.vertices);
