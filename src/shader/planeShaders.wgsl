@@ -1,5 +1,7 @@
 struct VSOut {
     @builtin(position) position: vec4f,
+    @location(0) normal: vec4f, 
+    @location(1) color: vec4f
 };
 
 struct Uniforms {
@@ -12,13 +14,15 @@ struct Uniforms {
 var<uniform> uniforms: Uniforms;
 
 @vertex
-fn main_vs(@location(0) inPos: vec3f) -> VSOut {
+fn main_vs(@location(0) inPos: vec4f, @location(2) normal: vec4f, @location(1) color: vec4f) -> VSOut {
     var vsOut: VSOut;
-    vsOut.position = uniforms.proj * uniforms.view * uniforms.model * vec4(inPos, 1);
+    vsOut.position = uniforms.proj * uniforms.view * uniforms.model * inPos;
+    vsOut.normal = normal; 
+    vsOut.color = color;
     return vsOut;
 }
 
 @fragment
-fn main_fs() -> @location(0) vec4f {
-    return vec4(1.0, 1.0, 1.0, 1.0);
+fn main_fs(@location(0) normal: vec4f, @location(1) color: vec4f) -> @location(0) vec4f {
+    return color;
 }

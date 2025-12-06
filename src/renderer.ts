@@ -192,7 +192,7 @@ export class Renderer {
         pass.setBindGroup(0, this.bindGroup);
         // recursive traversal:
         this.renderNode(rootNode, pass, model, view, proj);
-        console.log("Reached traverse end.")
+        //console.log("Reached traverse end.")
         pass.end()
         this.device.queue.submit([encoder.finish()]);
     }
@@ -208,17 +208,19 @@ export class Renderer {
         pass.setBindGroup(0, node.bindGroup);
         this.device.queue.writeBuffer(node.uniformBuffer, 0, new Float32Array(uniform));
         pass.setVertexBuffer(0, node.positionBuffer);
+        pass.setVertexBuffer(1, node.normalBuffer);
+        pass.setVertexBuffer(2, node.colorBuffer);
         pass.setIndexBuffer(node.indexBuffer, 'uint32');
 
         pass.drawIndexed(node.indices.length);
 
         if (node.child != null) {
-            console.log("going to render child node");
+            //console.log("going to render child node");
             this.renderNode(node.child, pass, worldModel, view, proj);
         } 
 
         if (node.sibling != null) {
-            console.log("going to render sibling node");
+            //console.log("going to render sibling node");
             this.renderNode(node.sibling, pass, model, view, proj);
         }
 
@@ -272,7 +274,7 @@ export class Renderer {
             vertex: {
                 module: this.wgsl,
                 entryPoint: 'main_vs',
-                buffers: [this.positionBufferLayout]//, this.colorBufferLayout, this.normalBufferLayout],
+                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout]//, this.colorBufferLayout, this.normalBufferLayout],
             },
             fragment: {
                 module: this.wgsl,
@@ -296,19 +298,18 @@ export class Renderer {
         this.positionBufferLayout = {
             arrayStride: 16, // sizeof vec4 (4 * 4 bytes) - positions stored as vec4 in OBJParser
             attributes: [{
-                format: 'float32x3',
+                format: 'float32x4',
                 offset: 0,
                 shaderLocation: 0, // Position, see vertex shader
             }],
         };
 
-        /*
         this.colorBufferLayout = {
             arrayStride: 16, // sizeof vec4 (4 * 4 bytes)
             attributes: [{
                 format: 'float32x4',
                 offset: 0,
-                shaderLocation: 1,
+                shaderLocation: 2,
             }]
         };
 
@@ -317,10 +318,9 @@ export class Renderer {
             attributes: [{
                 format: 'float32x4',
                 offset: 0,
-                shaderLocation: 2,
+                shaderLocation: 1,
             }]
         }
-            */
     }
 
     private createBuffers() {

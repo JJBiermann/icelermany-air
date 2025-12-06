@@ -10,6 +10,8 @@ export class RenderNode {
     device: GPUDevice;
     positionBuffer: GPUBuffer;
     indexBuffer: GPUBuffer;
+    colorBuffer: GPUBuffer;
+    normalBuffer: GPUBuffer;
     bindGroup: GPUBindGroup;
     pipeline: GPURenderPipeline;
     uniformBuffer: GPUBuffer;
@@ -18,6 +20,8 @@ export class RenderNode {
         modelM: Mat,
         vertices: number[],
         indices: number[],
+        normals: number[],
+        colors: number[],
         sibling: RenderNode | null = null,
         child: RenderNode | null = null,
         device: GPUDevice,
@@ -32,10 +36,20 @@ export class RenderNode {
         this.pipeline = pipeline;
 
         this.positionBuffer = this.device.createBuffer({
-            size: vertices.length * sizeof['vec3'],
+            size: vertices.length * sizeof['vec4'],
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
         });
 
+
+        this.colorBuffer = this.device.createBuffer({
+            size: vertices.length * sizeof['vec4'],
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
+        });
+
+        this.normalBuffer = this.device.createBuffer({
+            size: vertices.length * sizeof['vec4'],
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
+        });
 
         this.indexBuffer = this.device.createBuffer({
             size: indices.length * 4,
@@ -56,6 +70,8 @@ export class RenderNode {
         });
 
         this.device.queue.writeBuffer(this.positionBuffer, 0, new Float32Array(vertices));
+        this.device.queue.writeBuffer(this.colorBuffer, 0, new Float32Array(colors));
+        this.device.queue.writeBuffer(this.normalBuffer, 0, new Float32Array(normals));
         this.device.queue.writeBuffer(this.indexBuffer, 0, new Uint32Array(indices));
 
     }
