@@ -24,6 +24,18 @@ async function main() {
         0, 0, 0, 1
     ];
 
+    const cubeVertices = [
+        -0.25, 0, -0.25,  //left back down
+        -0.25, 0, 0.25,   //right back down    
+        0.25, 0, -0.25,   //left front down    
+        0.25, 0, 0.25,   //right front down    
+    ]
+
+    const indices = [
+        0, 1, 3, // left back -> right back -> right front
+        3, 2, 0, // right front -> left front -> back left
+    ]
+
     // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
     var eye = vec3(0, 0, 2);      // eye is a point
     var lookat = vec3(0, 0, 0);     // lookat is a point  -> eye - point --> Direction looking at
@@ -120,7 +132,7 @@ async function main() {
                     lookat = vec3(0, 0, 0);     // lookat is a point  -> eye - point --> Direction looking at
                     up = vec3(0, 1, 0);
                     view = lookAt(eye, lookat, up);
-                    
+
                 }
                 egoPerspective = !egoPerspective;
                 moved = true;

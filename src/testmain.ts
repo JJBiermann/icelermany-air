@@ -25,10 +25,10 @@ async function main() {
     ]
 
     const childVertices = [
-  -0.1, 0, -0.1,
-  -0.1, 0,  0.1,
-   0.1, 0, -0.1,
-   0.1, 0,  0.1,
+  -0.1, 0.5, -0.1,
+  -0.1, 0.5,  0.1,
+   0.1, 0.5, -0.1,
+   0.1, 0.5,  0.1,
 ];
 
     const indices = [
@@ -60,12 +60,15 @@ async function main() {
         ...Array.from(flatten(projection)), // proj matrix
     ]);
 
-    renderer.updatePositionBuffer([...cubeVertices, ...cubeVertices]);
-    renderer.updateIndicesBuffer([...indices, ...indices]);
+    let dev = renderer.getDevice();
+    let pipeline = renderer.getPipeline();
 
     // one position offset = 12 bytes => 12 * 6 = 72 bytes => 72
-    let childNode = new RenderNode(translate(-1, 0, 0), mat4(), mat4(), renderer.renderNode.bind(renderer), childVertices, indices, null, null, 6, 6, 48)
-    let rootNode = new RenderNode(translate(0, 0, 0), mat4(), mat4(), renderer.renderNode.bind(renderer), cubeVertices, indices, null, childNode, 6, 0, 0);
+    let childNode = new RenderNode(translate(0.5, 0, 0), childVertices, indices, null, null, dev, pipeline)
+    let rootNode = new RenderNode(translate(-0.5, -0.5, 0), cubeVertices, indices, null, childNode, dev, pipeline);
+    renderer.renderHierarchy(rootNode, mat4(), view, projection);
+
+    rootNode.udpateModelMatrix(translate(0, 0, 0));
     renderer.renderHierarchy(rootNode, mat4(), view, projection);
     /*
     const moveStep = 0.1; // how much to move per key press

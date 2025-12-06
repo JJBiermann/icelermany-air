@@ -1,4 +1,4 @@
-import { flatten, sizeof, type Mat } from './utils/MV';
+import { flatten, mult, sizeof, type Mat } from './utils/MV';
 import { RenderNode } from './node';
 
 interface RendererConfig {
@@ -190,7 +190,8 @@ export class Renderer {
         // inside every node, there has to be a custom render function for that node.
         pass.setPipeline(this.pipeline);
         pass.setBindGroup(0, this.bindGroup);
-        rootNode.traverse(pass, model, view, proj);
+        // recursive traversal:
+        this.renderNode(rootNode, pass, model, view, proj);
         console.log("Reached traverse end.")
         pass.end()
         this.device.queue.submit([encoder.finish()]);
@@ -201,23 +202,27 @@ export class Renderer {
         if (node == null) {
             throw new Error("WTF is happening lol");
         }
-        console.log("view: ", view);
-        console.log("proj: ", proj);
-        // update the model matrix of the uniform buffer
-        console.log("drawing node with model:", Array.from(flatten(model)));
-        let uniform : number[] = [...Array.from(flatten(model)), ...Array.from(flatten(view)), ...Array.from(flatten(proj))]
-        this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(uniform));
-        // update position buffer --> NOTE: rethink if this is the best way to approach this.
-        //this.device.queue.writeBuffer(this.positionBuffer, 0, new Float32Array(node.vertices));
-        // update the indices buffer --> NOTE: same as above
-        //this.device.queue.writeBuffer(this.indicesBuffer, 0, new Uint32Array(node.indices));
+        let worldModel = mult(model, node.modelM);
 
-      
-        pass.setVertexBuffer(0, this.positionBuffer, node.vertexOffset);
-        pass.setIndexBuffer(this.indicesBuffer, 'uint32', node.indexOffset);
-        //pass.setVertexBuffer(1, this.colorBuffer);
-        //pass.setVertexBuffer(2, this.normalBuffer);
-        pass.drawIndexed(node.indexCount, 1);
+        let uniform : number[] = [...Array.from(flatten(worldModel)), ...Array.from(flatten(view)), ...Array.from(flatten(proj))]
+        pass.setBindGroup(0, node.bindGroup);
+        this.device.queue.writeBuffer(node.uniformBuffer, 0, new Float32Array(uniform));
+        pass.setVertexBuffer(0, node.positionBuffer);
+        pass.setIndexBuffer(node.indexBuffer, 'uint32');
+
+        pass.drawIndexed(node.indices.length);
+
+        if (node.child != null) {
+            console.log("going to render child node");
+            this.renderNode(node.child, pass, worldModel, view, proj);
+        } 
+
+        if (node.sibling != null) {
+            console.log("going to render sibling node");
+            this.renderNode(node.sibling, pass, model, view, proj);
+        }
+
+       
     }
 
     private async initGpuHandle() {
@@ -427,5 +432,13 @@ export class Renderer {
 
     public getDevice(): GPUDevice {
         return this.device;
+    }
+
+    public getUniformBuffer(): GPUBuffer {
+        return this.uniformBuffer;
+    }
+
+    public getPipeline(): GPURenderPipeline {
+        return this.pipeline;
     }
 }
