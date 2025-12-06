@@ -1,8 +1,8 @@
 import { sizeof } from "./utils/MV";
-import shader from "./shader/shaders.wgsl";
+import shader from "./shader/planeShaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY } from "./utils/MV";
 
 
 window.onload = (_) => { main(); };
@@ -37,7 +37,7 @@ async function main() {
     ]
 
     // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
-    var eye = vec3(0, 0, 2);      // eye is a point
+    var eye = vec3(10, 0, 0);      // eye is a point
     var lookat = vec3(0, 0, 0);     // lookat is a point  -> eye - point --> Direction looking at
     var up = vec3(0, 1, 0);
     let view = lookAt(eye, lookat, up);
@@ -46,8 +46,16 @@ async function main() {
     let tx = 0;
     let ty = 0;
     let tz = 0;
-    let modelMatrix = mult(translate(tx, ty, tz), scalem(0.25, 0.25, 0.25));
 
+    // move to center -> rotate -> move back
+    // coordinates in Blender (x=2.0, y=0.54629, z=0) => (x=2.0, 0, -0.6)
+    const leftAileronTransform = vec3(2.0116, 0.042162, -0.54629); 
+    const rightAileronTransform = vec3(-2.0031, 0.044753, -0.54652);
+    const leftElevatorTransform = vec3(1.0151, 0.048431, -4.0851);
+    const rightElevatorTransform = vec3(-1.0459, 0.047272, -4.0859);
+    const rudderTransform = vec3(0.009496, 0.59494, -4.2548);
+    
+    let modelMatrix = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]),mult(rotateX(90), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2]))); //translate(-2.0116, 0.042162, +0.54629))
     // Pinhole camera with 45° vertical FOV
     const fovy = 45;       // degrees (MV.js-style perspective usually expects degrees)
     const near = 0.1;
@@ -83,12 +91,32 @@ async function main() {
     renderer.updateUniformBuffer(Array.from(uniformData));
 
     // Load OBJ file
-    const objData = await readOBJFile("../../../blender-models/proto-plane.obj", 0.25);
+    const objData = await readOBJFile("../../../blender-models/deadcenter.obj", 1);
+    //const objData = await readOBJFile("../../../blender-models/rudder.obj", 1);
     console.log(objData);
     console.log(objData?.vertices);
+
+
+    const coolUniformData = new Float32Array([
+        ...Array.from(flatten(modelMatrix)), // model matrix
+        ...Array.from(flatten(view)), // view matrix
+        ...Array.from(flatten(projection)), // proj matrix
+        ...vec3(-1, -2, -1),
+        0.0,
+        ...vec3(1, 1, 1),
+        1.0,
+        1.0,
+        10_000,
+        1.0,
+        0.7,
+    ]);
+
+
+
+    renderer.updateUniformBuffer(Array.from(coolUniformData));
     if (objData) {
         renderer.updatePositionBuffer(Array.from(objData.vertices));
-        console.log("vertices: ", objData.vertices);
+        //console.log("vertices: ", objData.vertices);
         renderer.updateColorBuffer(Array.from(objData.colors));
         renderer.updateIndicesBuffer(Array.from(objData.indices));
         renderer.updateNormals(Array.from(objData.normals));

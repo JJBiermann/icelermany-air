@@ -294,7 +294,7 @@ export class Renderer {
     private configureVertexBufferLayouts() {
 
         this.positionBufferLayout = {
-            arrayStride: 12, // sizeof vec4 (4 * 4 bytes) - positions stored as vec4 in OBJParser
+            arrayStride: 16, // sizeof vec4 (4 * 4 bytes) - positions stored as vec4 in OBJParser
             attributes: [{
                 format: 'float32x3',
                 offset: 0,
