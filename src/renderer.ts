@@ -38,7 +38,8 @@ export class Renderer {
     constructor(config: RendererConfig) {
         this.config = {
             msaaCount: 1,
-            backgroundColor: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
+            //backgroundColor: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
+            backgroundColor: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
             uniformBufferSize: 150,
             pipelinePrimitive: {
                 topology: 'triangle-list',

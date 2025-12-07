@@ -51,16 +51,19 @@ fn main_fs(@location(0) pos_eye: vec3f, @location(1) normal_eye: vec3f, @locatio
     let w_r = normalize(2.0 * dot(w_i, n) * n - w_i);
     // reflection direction
 
+    // Use vertex color (from MTL) as the material color
+    let material_color = color.rgb;
+    
     // scaling
-    let k_d = uniforms.k_d_factor * K_D;
+    let k_d = uniforms.k_d_factor * material_color; // Use material color instead of K_D
     let k_s = uniforms.k_s_factor * K_S;
-    let L_a = uniforms.L_a_factor * L_A;
+    let L_a = uniforms.L_a_factor * material_color; // Use material color for ambient too
     let L_e = uniforms.L_e_factor * L_E;
 
     // Phong terms
     let L_r_d = k_d * uniforms.light_color * max(dot(n, w_i), 0.0);
     let L_r_s = k_s * uniforms.light_color * pow(max(dot(w_r, w_o), 0.0), uniforms.s);
-    let L_r_a = k_d * L_a;
+    let L_r_a = L_a; // Ambient should just be L_a (which already has material color)
 
     var L_o = L_r_d + L_r_s + L_r_a;
 
