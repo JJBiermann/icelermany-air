@@ -2,7 +2,7 @@ import { sizeof, type Mat } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, inverse } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -24,10 +24,10 @@ let right = mat4();
 let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
-let planeM = mat4();
+let planeM = translate(0,60,0);
 
-var eye = vec3(0, 15, -30);      // eye is a point
-var lookat = vec3(0, 0, 0);     // lookat is a point  -> eye - point --> Direction looking at
+var eye = vec3(0, 100, -30);      // eye is a point
+var lookat = vec3(0, 70,0);     // lookat is a point  -> eye - point --> Direction looking at
 var up = vec3(0, 1, 0);
 let view = lookAt(eye, lookat, up);
 
@@ -142,7 +142,7 @@ async function main() {
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -60) so plane flies above it
-        let sphereM = translate(0, -60, 40);
+        let sphereM = translate(0, 0, 0);
     let sphereNode: RenderNode = new RenderNode(sphereM, Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
     planeNode.sibling = sphereNode;
 
@@ -173,7 +173,7 @@ async function main() {
         rudder.udpateModelMatrix(rudderM);
         planeNode.udpateModelMatrix(planeM);
         // Spin the sphere slowly around Y and have it little bit down 
-        sphereM = mult(translate(0, -70, 40), rotateX(change * sphereSpinFactor));
+        sphereM = rotateX(change * sphereSpinFactor);
         sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
@@ -220,7 +220,10 @@ async function main() {
         }
 
         if (moved) {
-            planeM = mult(rotateZ(tx), rotateX(ty));
+            let inverseM =  translate(0, -60, 0);
+            let baseM = translate(0, 60, 0);
+            let rotation = mult(rotateZ(tx), rotateX(ty));
+            planeM = mult(baseM,rotation);
 
         }
     });
