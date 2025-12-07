@@ -32,6 +32,7 @@ export class Renderer {
     private positionBufferLayout!: GPUVertexBufferLayout;
     private colorBufferLayout!: GPUVertexBufferLayout;
     private normalBufferLayout!: GPUVertexBufferLayout;
+    private uvBufferLayout!: GPUVertexBufferLayout;
 
     private config!: RendererConfig;
     private lightTheta = 0;
@@ -240,6 +241,7 @@ export class Renderer {
         pass.setVertexBuffer(0, node.positionBuffer);
         pass.setVertexBuffer(1, node.colorBuffer);
         pass.setVertexBuffer(2, node.normalBuffer);
+        pass.setVertexBuffer(3, node.uvBuffer);
         pass.setIndexBuffer(node.indexBuffer, 'uint32');
 
         pass.drawIndexed(node.indices.length);
@@ -304,7 +306,7 @@ export class Renderer {
             vertex: {
                 module: this.wgsl,
                 entryPoint: 'main_vs',
-                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout]//, this.colorBufferLayout, this.normalBufferLayout],
+                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout, this.uvBufferLayout],
             },
             fragment: {
                 module: this.wgsl,
@@ -350,7 +352,16 @@ export class Renderer {
                 offset: 0,
                 shaderLocation: 2, // normal @location(2)
             }]
-        }
+        };
+
+        this.uvBufferLayout = {
+            arrayStride: 8, // 2 floats
+            attributes: [{
+                format: 'float32x2',
+                offset: 0,
+                shaderLocation: 3, // uv @location(3)
+            }]
+        };
     }
 
     private createBuffers() {
@@ -385,12 +396,36 @@ export class Renderer {
     }
 
     private createBindGroups() {
+        // Fallback bind group; per-node bind groups will override during rendering
+        const fallbackSampler = this.device.createSampler();
+        const fallbackTexture = this.device.createTexture({
+            size: [1, 1, 1],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        this.device.queue.writeTexture(
+            { texture: fallbackTexture },
+            new Uint8Array([255, 255, 255, 255]),
+            { bytesPerRow: 4 },
+            [1, 1, 1]
+        );
+
         this.bindGroup = this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
-            entries: [{
-                binding: 0,
-                resource: { buffer: this.uniformBuffer }
-            }]
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this.uniformBuffer }
+                },
+                {
+                    binding: 1,
+                    resource: fallbackSampler
+                },
+                {
+                    binding: 2,
+                    resource: fallbackTexture.createView()
+                }
+            ]
         });
     }
 

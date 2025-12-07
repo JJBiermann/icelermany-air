@@ -3,6 +3,7 @@ struct VSOut {
     @location(0) pos_eye: vec3f,
     @location(1) normal_eye: vec3f,
     @location(2) color: vec4f,
+    @location(3) uv: vec2f,
 };
 
 struct Uniforms {
@@ -27,8 +28,19 @@ const L_A: vec3f = vec3(1.0, 1.0, 1.0);
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
+@group(0) @binding(1)
+var samp: sampler;
+
+@group(0) @binding(2)
+var tex: texture_2d<f32>;
+
 @vertex
-fn main_vs(@location(0) inPos: vec4f, @location(1) inColor: vec4f, @location(2) inNorm: vec4f) -> VSOut {
+fn main_vs(
+    @location(0) inPos: vec4f,
+    @location(1) inColor: vec4f,
+    @location(2) inNorm: vec4f,
+    @location(3) inUV: vec2f,
+) -> VSOut {
     var vsOut: VSOut;
     let pos_eye = (uniforms.view * uniforms.model * inPos).xyz;
     // For a sphere centered at origin, the normal is just the normalized position
@@ -38,21 +50,29 @@ fn main_vs(@location(0) inPos: vec4f, @location(1) inColor: vec4f, @location(2) 
     vsOut.pos_eye = pos_eye;
     vsOut.normal_eye = n_eye;
     vsOut.color = inColor;
+    vsOut.uv = inUV;
     // material color
 
     return vsOut;
 }
 
 @fragment
-fn main_fs(@location(0) pos_eye: vec3f, @location(1) normal_eye: vec3f, @location(2) color: vec4f) -> @location(0) vec4f {
+fn main_fs(
+    @location(0) pos_eye: vec3f,
+    @location(1) normal_eye: vec3f,
+    @location(2) color: vec4f,
+    @location(3) uv: vec2f,
+) -> @location(0) vec4f {
     let n = normalize(normal_eye);
     let w_i = normalize(- (uniforms.view * vec4(uniforms.light_direction, 0.0)).xyz);
     let w_o = normalize(- pos_eye);
     let w_r = normalize(2.0 * dot(w_i, n) * n - w_i);
     // reflection direction
 
-    // Use vertex color (from MTL) as the material color
-    let material_color = color.rgb;
+    // Use vertex color (from MTL) multiplied by texture sample; fallback to pure vertex color if sample is black (e.g., missing texture)
+    let texColor = textureSample(tex, samp, uv).rgb;
+    let texStrength = max(max(texColor.r, texColor.g), texColor.b);
+    let material_color = select(color.rgb, color.rgb * texColor, texStrength > 0.0001);
     
     // scaling
     let k_d = uniforms.k_d_factor * material_color; // Use material color instead of K_D
