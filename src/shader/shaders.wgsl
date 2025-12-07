@@ -28,13 +28,13 @@ const L_A: vec3f = vec3(1.0, 1.0, 1.0);
 var<uniform> uniforms: Uniforms;
 
 @vertex
-fn main_vs(@location(0) inPos: vec3f, @location(1) inColor: vec4f, @location(2) inNorm: vec4f) -> VSOut {
+fn main_vs(@location(0) inPos: vec4f, @location(1) inColor: vec4f, @location(2) inNorm: vec4f) -> VSOut {
     var vsOut: VSOut;
-    let pos_eye = (uniforms.view * uniforms.model * vec4(inPos, 1.0)).xyz;
+    let pos_eye = (uniforms.view * uniforms.model * inPos).xyz;
     // For a sphere centered at origin, the normal is just the normalized position
     let n_eye = normalize(uniforms.view * uniforms.model * inNorm).xyz;
 
-    vsOut.position = uniforms.proj * uniforms.view * uniforms.model * vec4(inPos, 1.0);
+    vsOut.position = uniforms.proj * uniforms.view * uniforms.model * inPos;
     vsOut.pos_eye = pos_eye;
     vsOut.normal_eye = n_eye;
     vsOut.color = inColor;

@@ -57,7 +57,7 @@ export class RenderNode {
         })
 
         this.uniformBuffer = this.device.createBuffer({
-            size: 3 * sizeof["mat4"],
+            size: 256, // matrices + lighting params
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
         })
 

@@ -34,13 +34,16 @@ export class Renderer {
     private normalBufferLayout!: GPUVertexBufferLayout;
 
     private config!: RendererConfig;
+    private lightTheta = 0;
+    private lightDir: [number, number, number, number] = [0.0, -0.5, 1.0, 0.0];
 
     constructor(config: RendererConfig) {
         this.config = {
             msaaCount: 1,
             //backgroundColor: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
             backgroundColor: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
-            uniformBufferSize: 150,
+            // 3 matrices (192 bytes) + lighting params padding
+            uniformBufferSize: 256,
             pipelinePrimitive: {
                 topology: 'triangle-list',
                 frontFace: 'ccw',
@@ -172,6 +175,12 @@ export class Renderer {
     }
 
     public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat) {
+        // Rotate light on a horizontal ring around Y (no tilt); speed ~globe
+        this.lightTheta += 0.002;
+        const lx = Math.cos(this.lightTheta);
+        const lz = Math.sin(this.lightTheta);
+        this.lightDir = [lx, 0.0, lz, 0.0];
+
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
@@ -205,12 +214,32 @@ export class Renderer {
         }
         let worldModel = mult(model, node.modelM);
 
-        let uniform : number[] = [...Array.from(flatten(worldModel)), ...Array.from(flatten(view)), ...Array.from(flatten(proj))]
+        // Pack matrices followed by lighting params (matches shaders.wgsl Uniforms layout)
+            const lightDirection = this.lightDir;
+            const lightColor = [1.0, 0.98, 0.94, 0.0]; // ~6500K sunlight tint
+            const k_d_factor = 0.5;
+            const k_s_factor = 0.2;   // softer, less plastic specular
+            const shininess = 64.0;   // tighter highlight like sun
+            const L_e_factor = 0.5;   // no emissive
+            const L_a_factor = 0.03;  // low ambient fill
+
+        const uniform : number[] = [
+            ...Array.from(flatten(worldModel)),
+            ...Array.from(flatten(view)),
+            ...Array.from(flatten(proj)),
+            ...lightDirection,
+            ...lightColor,
+            k_d_factor,
+            k_s_factor,
+            shininess,
+            L_e_factor,
+            L_a_factor,
+        ];
         pass.setBindGroup(0, node.bindGroup);
         this.device.queue.writeBuffer(node.uniformBuffer, 0, new Float32Array(uniform));
         pass.setVertexBuffer(0, node.positionBuffer);
-        pass.setVertexBuffer(1, node.normalBuffer);
-        pass.setVertexBuffer(2, node.colorBuffer);
+        pass.setVertexBuffer(1, node.colorBuffer);
+        pass.setVertexBuffer(2, node.normalBuffer);
         pass.setIndexBuffer(node.indexBuffer, 'uint32');
 
         pass.drawIndexed(node.indices.length);
@@ -310,7 +339,7 @@ export class Renderer {
             attributes: [{
                 format: 'float32x4',
                 offset: 0,
-                shaderLocation: 2,
+                shaderLocation: 1, // color @location(1)
             }]
         };
 
@@ -319,7 +348,7 @@ export class Renderer {
             attributes: [{
                 format: 'float32x4',
                 offset: 0,
-                shaderLocation: 1,
+                shaderLocation: 2, // normal @location(2)
             }]
         }
     }

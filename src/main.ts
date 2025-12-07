@@ -1,5 +1,5 @@
 import { sizeof, type Mat } from "./utils/MV";
-import shader from "./shader/planeShaders.wgsl";
+import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
 import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate } from "./utils/MV";
@@ -35,7 +35,7 @@ async function main() {
     const renderer: Renderer = new Renderer({
         shaderCode: shader,
         is3DRenderer: true,
-        uniformBufferSize: 240,
+        uniformBufferSize: 256,
     });
 
     await renderer.init();
