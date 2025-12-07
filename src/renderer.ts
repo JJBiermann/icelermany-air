@@ -37,6 +37,7 @@ export class Renderer {
     private config!: RendererConfig;
     private lightTheta = 0;
     private lightDir: [number, number, number, number] = [0.0, -0.5, 1.0, 0.0];
+    private lightSpinEnabled = true;
 
     constructor(config: RendererConfig) {
         this.config = {
@@ -85,6 +86,15 @@ export class Renderer {
         this.createBuffers();
         this.createBindGroups();
         this.createTextures();
+    }
+
+    public setLightSpinEnabled(enabled: boolean): void {
+        this.lightSpinEnabled = enabled;
+    }
+
+    public toggleLightSpin(): boolean {
+        this.lightSpinEnabled = !this.lightSpinEnabled;
+        return this.lightSpinEnabled;
     }
 
     public updatePositionBuffer(inBuffer: number[]): void {
@@ -176,11 +186,13 @@ export class Renderer {
     }
 
     public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat) {
-        // Rotate light on a horizontal ring around Y (no tilt); speed ~globe
-        this.lightTheta += 0.002;
-        const lx = Math.cos(this.lightTheta);
-        const lz = Math.sin(this.lightTheta);
-        this.lightDir = [lx, 0.0, lz, 0.0];
+        // Rotate light on a horizontal ring around Y (no tilt); can be paused via toggle
+        if (this.lightSpinEnabled) {
+            this.lightTheta += 0.002;
+            const lx = Math.cos(this.lightTheta);
+            const lz = Math.sin(this.lightTheta);
+            this.lightDir = [lx, 0.0, lz, 0.0];
+        }
 
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({

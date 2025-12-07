@@ -42,6 +42,15 @@ async function main() {
 
     const device = renderer.getDevice();
 
+    const toggleLightBtn = document.getElementById('toggle-circle-light') as HTMLButtonElement | null;
+    let lightSpinEnabled = true;
+    toggleLightBtn?.addEventListener('click', () => {
+        lightSpinEnabled = renderer.toggleLightSpin();
+        if (toggleLightBtn) {
+            toggleLightBtn.textContent = lightSpinEnabled ? 'Circle light on (spinning)' : 'Circle light off (paused)';
+        }
+    });
+
     async function loadTexture(url: string): Promise<GPUTexture> {
         const res = await fetch(url);
         if (!res.ok) {
@@ -139,9 +148,15 @@ async function main() {
 
     let angle = 0;
     let change = 0;
-    update();
-    function update() {
-        change += 0.02;
+    const baseAngularSpeed = 1.2; // radians per second at ~60fps matches previous 0.02/frame
+    const sphereSpinFactor = 10;   // multiply change for globe spin
+    let lastTime = performance.now();
+
+    function update(timestamp: number) {
+        const dt = Math.min((timestamp - lastTime) / 1000, 0.05); // clamp to avoid big jumps
+        lastTime = timestamp;
+
+        change += baseAngularSpeed * dt;
         angle = 45 * Math.cos(change);
 
         let { l, r, lE, rE } = tiltAileronsAndElevators(angle);
@@ -158,13 +173,13 @@ async function main() {
         rudder.udpateModelMatrix(rudderM);
         planeNode.udpateModelMatrix(planeM);
         // Spin the sphere slowly around Y and have it little bit down 
-            
-            sphereM = mult(translate(0, -70, 40), rotateX(change * 10));
+        sphereM = mult(translate(0, -70, 40), rotateX(change * sphereSpinFactor));
         sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
-        requestAnimationFrame(update)
+        requestAnimationFrame(update);
     }
+    requestAnimationFrame(update);
 
 
     /*
