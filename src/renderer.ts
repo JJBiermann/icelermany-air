@@ -518,4 +518,22 @@ export class Renderer {
     public getPipeline(): GPURenderPipeline {
         return this.pipeline;
     }
+
+    public resize(width: number, height: number) {
+        this.canvas.width = width;
+        this.canvas.height = height;
+
+        // Recreate depth texture
+        if (this.depthTexture) {
+            this.depthTexture.destroy();
+        }
+        this.depthTexture = this.device.createTexture({
+            size: {
+                width: this.canvas.width,
+                height: this.canvas.height
+            },
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
 }

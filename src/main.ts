@@ -25,7 +25,7 @@ let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
 let planeX = 0;
-let planeY = 30;
+let planeY = 25;
 let planeZ = 0;
 let planeTranslation = translate(planeX, planeY, planeZ);
 let planeM = mult(planeTranslation, rotateX(90));
@@ -111,11 +111,20 @@ async function main() {
     //let modelMatrix: Mat = mult(translate(0, 0, 0), );
     //let modelMatrix = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]),mult(rotateX(0), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2]))); //translate(-2.0116, 0.042162, +0.54629))
     // Pinhole camera with 45° vertical FOV
-    const fovy = 45;       // degrees (MV.js-style perspective usually expects degrees)
+    const fovy = 80;       // degrees (MV.js-style perspective usually expects degrees)
     const near = 0.1;
     const far = 100.0;
-    const projection = perspective(fovy, 1, near, far);
+    let projection = perspective(fovy, 1, near, far);
 
+    function onResize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.resize(w, h);
+        const aspect = w / h;
+        projection = perspective(fovy, aspect, near, far);
+    }
+    window.addEventListener('resize', onResize);
+    onResize(); // Initial call to set full screen
 
     // Load OBJ file
     const planeData = await readOBJFile("../../../blender-models/plane-parts/planebody.obj");
@@ -127,7 +136,8 @@ async function main() {
 
 
     // create the sphere with radius 15, 32 stacks and 64 slices
-    const sphere = generateSphere(20, 32, 64);
+    const sphereRadius = 20;
+    const sphere = generateSphere(sphereRadius, 32, 64);
 
     const pipeline = renderer.getPipeline();
 
@@ -179,40 +189,158 @@ async function main() {
         requestAnimationFrame(animate);
     }
 
-    let speed = 0.1
+    let speed = 0.05
     let yAngle = 0;
+    let xAngle = 0;
     let zAngle = 0;
     let zSpeed = 0
-    function update(dt: number) {
-        sphereM = mult(rotateZ(-zSpeed), mult(rotateX((speed - Math.abs(zSpeed))), sphereM));
+    let xSpeed = 0
+    const planeScale = 0.03;
+    const followDistance = -0.5; // how far behind the plane
+    const followHeight = 0.2;    // how far above the plane
+    const glideBase = 10;      // units/sec at max pitch (tune this)
+    const maxPitchDeg = 30;   // matches your clamp
 
-        planeM = mult(translate(0, 0, -30), mult(rotateX(90), mult(rotateY(yAngle), rotateZ(zAngle))));
+
+    function update(dt: number) {
+
+        // Throttle control
+        if (wPressed) {
+            speed = Math.min(0.2, speed + 0.05 * dt); // Max speed 0.2
+        }
+        if (sPressed) {
+            speed = Math.max(0.001, speed - 0.05 * dt); // Min speed 0.001
+        }
+
+        const pitchFactor = Math.min(1, Math.abs(xAngle) / maxPitchDeg);
+        if (pitchFactor > 0) {
+            const glide = glideBase * pitchFactor * dt;
+            if (xAngle < 0) {
+                planeY -= glide; // nose-down -> descend
+            } else if (xAngle > 0) {
+                planeY += glide; // nose-up   -> climb
+            }
+        }
+
+        // Prevent crashing into earth
+        // sphereRadius is 20. We add a small buffer (0.5) so the plane sits on top.
+        if (planeY < sphereRadius + 0.15) {
+            planeY = sphereRadius + 0.15;
+            
+            // Auto-level: If hitting the ground nose-down, force the nose up to 0
+            if (xAngle < 0) {
+                xAngle = 0;
+            }
+        }
+
+        //sphereM = mult(rotateZ(-zSpeed), mult(rotateX((speed - Math.abs(zSpeed))), sphereM));
+        //With speed in the x direction (forward) 
+        sphereM = mult(
+            rotateX(-xSpeed),                    // forward/back tilt
+            mult(rotateZ(-zSpeed), mult(rotateX((Math.max(0.005,speed - Math.abs(zSpeed)))), sphereM))
+        );
+
+               planeM = mult(translate(0, 0, -planeY), mult(rotateX(90 + xAngle), mult(rotateY(yAngle), mult(rotateZ(zAngle), scalem(planeScale, planeScale, planeScale)))))
+
+        //With speed in the x direction (forward) 
+        /*planeM = mult(
+            translate(0, 0, -planeY),
+            mult(rotateX(90 + xAngle), mult(rotateY(yAngle), rotateZ(zAngle)))
+        );
+*/
+        // Camera follow: chase behind and above the plane based on yaw
+        // Camera follows full plane orientation
+        const localCamOffset = vec3(0, followHeight, followDistance);
+
+        // build orientation matrix of plane
+        const planeRotation =
+            mult(rotateX(90),
+                mult(rotateY(yAngle),
+                    rotateZ(-zAngle)));
+
+        // rotate camera offset into world space
+        const offset4 = mult(planeRotation, vec4(localCamOffset[0], localCamOffset[1], localCamOffset[2], 0));
+        const rotatedOffset = vec3(offset4[0], offset4[1], offset4[2]);
+
+        // plane position
+        const planePos = vec3(0, 0, -planeY);
+
+        // camera world position
+        eye = add(planePos, rotatedOffset);
+
+        // camera looks at plane
+        lookat = planePos;
+        up = vec3(0, planeY, 0);
+        // Calculate the up vector based on the plane's orientation
+        const up4 = mult(planeRotation, vec4(0, 1, 0, 0));
+        // update view matrix
+        view = lookAt(eye, lookat, up4.slice(0, 3) as Vec);
+
     }
 
 
     let leftPressed = false;
     let rightPressed = false;
+    let upPressed = false;
+    let downPressed = false;
+    let wPressed = false;
+    let sPressed = false;
     let steps = 10
     let MaxAileronAngle = 90;
+    let planePitch = 0;
+    
     window.addEventListener("keydown", (e) => {
+        // Prevent scrolling with arrow keys
+        if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)){
+            e.preventDefault();
+        }
+        if (e.key === "w" || e.key === "W") {
+            wPressed = true;
+        }
+        if (e.key === "s" || e.key === "S") {
+            sPressed = true;
+        }
         if (e.key === "ArrowLeft") {
-                console.log("left pressed!");
-                leftPressed = true;
-                yAngle = Math.max(-45, yAngle - (45 / steps));
-                zAngle = Math.min(60, zAngle + (60 / steps));
-                zSpeed = zAngle / 60 * speed;
+            console.log("left pressed!");
+            leftPressed = true;
+            yAngle = Math.max(-45, yAngle - (4.5 / steps));
+            zAngle = Math.min(60, zAngle + (6 / steps));
+            //zSpeed = zAngle / 6.0 * speed;
 
         }
         if (e.key === "ArrowRight") {
-                console.log("right pressed!");
-                leftPressed = true;
-                yAngle = Math.min(45, yAngle + (45 / steps));
-                zAngle = Math.max(-60, zAngle - (60 / steps));
-                zSpeed = zAngle / 60 * speed;
+            console.log("right pressed!");
+            leftPressed = true;
+            yAngle = Math.min(45, yAngle + (4.5 / steps));
+            zAngle = Math.max(-60, zAngle - (6 / steps));
+            //zSpeed = zAngle / 6.0 * speed;
+        }
+        if (e.key === "ArrowUp") {
+            console.log("up pressed!");
+            upPressed = true;
+            //planeY -= 0.1;
+            //speed *= Math.max(0.05, speed / 1.01);
+            xAngle = Math.max(-60, xAngle - (6 / steps));
+            //xSpeed = xAngle / 6.0 * speed;
+        }
+        if (e.key === "ArrowDown") {
+            console.log("down pressed!");
+            downPressed = true;
+            //speed *= Math.min(1, speed * 1.01);
+            //planeY += 0.1;
+            xAngle = Math.min(6.0, xAngle + (6 / steps));
+            //xSpeed = xAngle / 6.0 * speed;
+
         }
     });
 
     window.addEventListener("keyup", (e) => {
+        if (e.key === "w" || e.key === "W") {
+            wPressed = false;
+        }
+        if (e.key === "s" || e.key === "S") {
+            sPressed = false;
+        }
         if (e.key === "ArrowLeft") {
             if (leftPressed) {
                 console.log("left released!");
@@ -226,6 +354,18 @@ async function main() {
                 rightPressed = false;
             }
 
+        }
+        if (e.key === "ArrowUp") {
+            if (upPressed) {
+                console.log("up released!");
+                upPressed = false;
+            }
+        }
+        if (e.key === "ArrowDown") {
+            if (downPressed) {
+                console.log("down released!");
+                downPressed = false;
+            }
         }
     })
 }

@@ -1,20 +1,49 @@
-body {
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevents scrollbars */
     font-family: Arial, sans-serif;
+}
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+#my-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: white;
+}
+
+.ui-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 8px;
+    pointer-events: none; /* Let clicks pass through to canvas */
+}
+
+.ui-overlay button {
+    pointer-events: auto; /* Re-enable clicks for buttons */
+}
+
+body {
     display: flex;
     flex-direction: column;
     gap: 20px;
     padding: 20px;
     background-color: #f0f0f0;
-}
-
-#canvas-container {
-    display: flex;
-    justify-content: center;
-}
-
-#my-canvas {
-    border: 2px solid #333;
-    background-color: white;
 }
 
 .controls-section {
