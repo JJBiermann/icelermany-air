@@ -26,7 +26,7 @@ let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
 let planeX = 0;
-let planeY = 22;
+let planeY = 25;
 let planeZ = 0;
 let lat = 0;
 let lon = 0;
@@ -37,17 +37,17 @@ let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
 let planeM = mult(planeTranslation, rotateX(90));
 
-/*
-var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
-var lookat = vec4(planeX, planeY, planeZ, 1);     // lookat is a point  -> eye - point --> Direction looking at
+
+var eye = vec4(0, -10, -30, 1);      // eye is a point
+var lookat = vec4(0, 0, 0, 1);     // lookat is a point  -> eye - point --> Direction looking at
 var up = vec4(0, 1, 0, 0);
 //let view = lookAt(eye, lookat, up);
 
-let eyeWorld = mult(mult(planeXRotation, planeTranslation), eye);
-let lookAtWorld = mult(mult(planeXRotation, planeTranslation), lookat);
-let upWorld = mult(mult(planeXRotation, planeTranslation), up);
+//let eyeWorld = mult(planeM, eye);
+//let lookAtWorld = mult(planeM, lookat);
+//let upWorld = mult(planeM, up);
 
-let view = lookAt(
+/*let view = lookAt(
     vec3(eyeWorld[0], eyeWorld[1], eyeWorld[2]),
     vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
     vec3(upWorld[0], upWorld[1], upWorld[2])
@@ -186,8 +186,7 @@ async function main() {
         change += 0.02;
         angle = 45 * Math.cos(change);
         update(dt);
-        /*
-        TODO: THIS IS STILL NEEDED
+
         let { l, r, lE, rE } = tiltAileronsAndElevators(angle);
         left = l;
         right = r;
@@ -200,7 +199,6 @@ async function main() {
         leftElevator.udpateModelMatrix(leftE);
         rightElevator.udpateModelMatrix(rightE);
         rudder.udpateModelMatrix(rudderM);
-        */
         sphereNode.udpateModelMatrix(sphereM);
         planeNode.udpateModelMatrix(planeM);
 
