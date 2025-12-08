@@ -25,8 +25,8 @@ let right = mat4();
 let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
-let planeX = 25;
-let planeY = 0;
+let planeX = 0;
+let planeY = 22;
 let planeZ = 0;
 let lat = 0;
 let lon = 0;
@@ -35,7 +35,7 @@ let planeXRotation = mat4();
 let planeZRotation = mat4();
 let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
-let planeM = planeTranslation;
+let planeM = mult(planeTranslation, rotateX(90));
 
 /*
 var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
@@ -54,7 +54,7 @@ let view = lookAt(
 );
 */
 
-var eye = vec3(0, 0, -80);
+var eye = vec3(0, 0, -40);
 var lookat = vec3(0, 0, 0);
 var up = vec3(0, 1, 0);
 
@@ -169,7 +169,8 @@ async function main() {
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
-    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
+    let sphereM = mat4();
+    let sphereNode: RenderNode = new RenderNode(sphereM, Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
     planeNode.sibling = sphereNode;
 
     let angle = 0;
@@ -200,6 +201,7 @@ async function main() {
         rightElevator.udpateModelMatrix(rightE);
         rudder.udpateModelMatrix(rudderM);
         */
+        sphereNode.udpateModelMatrix(sphereM);
         planeNode.udpateModelMatrix(planeM);
 
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
@@ -220,118 +222,53 @@ async function main() {
         renderer.render(objData.indices.length);
     }
     */
-
-    let theta = 0;
-    let phi = 0;
-    let speed = Math.PI / (100 * 3.14)
-    Y = 90;
-    let alpha = 0
-    let deltaAlpha = 0
-    let planePos = vec3(0, 25, 0)
-    let r = 23;
-    phi = 0
-    theta = 0;
+    let speed = 0.1
+    let yAngle = 0;
+    let zAngle = 0;
+    let zSpeed = 0
+    let xSpeed = 0;
     function update(dt: number) {
+        sphereM = mult(rotateZ(-zSpeed), mult(rotateX((0.1 - Math.abs(zSpeed))), sphereM));
 
-        let x = Math.sin(theta) * Math.cos(phi) * r;
-        let y = Math.cos(theta) * r;
-        let z = Math.sin(theta) * Math.sin(phi) * r;
-
-
-
-        // planeM = mult(rotateX(-0.5 * (1 - Math.abs(Y / 90))), planeM);
-        // planeM = mult(rotateZ(-0.5 * Y / 90), planeM);
-        planeM = translate(x, y, z);
-        // planeM = mult(rotateZ(x), planeM);
-        //printm(planeM);
-        //planeM = mult(rotateZ(phi*0.5), planeM);
-
-        //planeM = mult(rotateX(dt * -speed * Math.cos(lon) * Math.cos(lat)), planeM);
-        //planeM = mult(rotateZ(dt * -speed * Math.cos(lat) * Math.sin(lon)), planeM);
+        planeM = mult(translate(0, 0, -22), mult(rotateX(90), mult(rotateY(yAngle), rotateZ(zAngle))));
     }
 
 
-    /*
-    let tiltChange = 5;
-    window.addEventListener("keydown", (e) => {
-        switch (e.key) {
-            case "ArrowLeft":
-                // move left in x
-                tilt = Math.min(90, tilt + tiltChange);
-                dx = Math.min(1, tilt * 1 / 45);
-                planeZRotation = rotateZ(tilt);
-                planeYRotation = rotateY(-tilt / 2)
-                break;
-            case "ArrowRight":
-                tilt = Math.max(-90, tilt - tiltChange);
-                dx = Math.max(-1, tilt * 1 / 45);
-                planeZRotation = rotateZ(tilt);
-                planeYRotation = rotateY(-tilt / 2)
-                break;
-            case "ArrowUp":
-                dy += moveStep * 2; // move up in y
-                break;
-            case "ArrowDown":
-                dy -= moveStep * 2; // move down in y
-                break;
-        }
-    });*/
-
-
-
-
+    let leftPressed = false;
+    let rightPressed = false;
+    let steps = 10
+    let MaxAileronAngle = 90;
     window.addEventListener("keydown", (e) => {
         if (e.key === "ArrowLeft") {
-            deltaAlpha += Math.PI/90;
-            let deltaPhi = 0
-            let deltaTheta = 0
-            deltaPhi = Math.sin(alpha + deltaAlpha) - Math.sin(alpha) 
-            deltaTheta = Math.cos(alpha + deltaAlpha) - Math.cos(alpha) 
-            phi += deltaPhi
-            theta += deltaTheta
-            alpha += deltaAlpha
-            // console.log("alpha: ", alpha);
-            // let deltaPhi = Math.sin(alpha); 
-            // phi += deltaPhi;
+                console.log("left pressed!");
+                leftPressed = true;
+                yAngle = Math.max(-45, yAngle - (45 / steps));
+                zAngle = Math.min(60, zAngle + (60 / steps));
+                zSpeed = zAngle / 60 * 0.1;
 
-            // let deltaTheta = Math.cos(alpha);
-            // theta += deltaTheta;
         }
         if (e.key === "ArrowRight") {
-            deltaAlpha -= Math.PI/90;
-            let deltaPhi = 0
-            let deltaTheta = 0
-            deltaPhi = Math.sin(alpha + deltaAlpha) - Math.sin(alpha) 
-            deltaTheta = Math.cos(alpha + deltaAlpha) - Math.cos(alpha) 
-            // deltaTheta = Math.cos(deltaAlpha)
-            phi += deltaPhi
-            theta += deltaTheta
-            alpha += deltaAlpha
-            //phi -= Math.PI/24;
-            // console.log("alpha: ", alpha);
-            // let deltaPhi = Math.sin(alpha); 
-            // phi += deltaPhi;
-
-            // let deltaTheta = Math.cos(alpha);
-            // theta += deltaTheta;
+                console.log("right pressed!");
+                leftPressed = true;
+                yAngle = Math.min(45, yAngle + (45 / steps));
+                zAngle = Math.max(-60, zAngle - (60 / steps));
+                zSpeed = zAngle / 60 * 0.1;
         }
-
-        /*
-        if (e.key === "ArrowUp") {
-            theta -= Math.PI/24;
-        }
-
-        if (e.key === "ArrowDown") {
-            theta += Math.PI/24
-        }
-        */
     });
 
     window.addEventListener("keyup", (e) => {
         if (e.key === "ArrowLeft") {
+            if (leftPressed) {
+                console.log("left released!");
+                leftPressed = false;
+            }
         }
 
         if (e.key === "ArrowRight") {
+            if (rightPressed) {
+                console.log("right released!");
+                rightPressed = false;
+            }
 
         }
     })
