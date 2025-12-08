@@ -137,7 +137,7 @@ async function main() {
 
     // create the sphere with radius 15, 32 stacks and 64 slices
     const sphereRadius = 20;
-    const sphere = generateSphere(sphereRadius, 32, 64);
+    const sphere = generateSphere(sphereRadius, 128, 256);
 
     const pipeline = renderer.getPipeline();
 
@@ -145,18 +145,24 @@ async function main() {
     console.log(planeData!.colors)
     let rightElevator: RenderNode = new RenderNode(rightE, Array.from(rightElevatorData!.vertices), Array.from(rightElevatorData!.indices), Array.from(rightElevatorData!.normals), Array.from(rightElevatorData!.colors), null, null, null, device, pipeline, sampler, whiteView);
     let leftElevator: RenderNode = new RenderNode(leftE, Array.from(leftElevatorData!.vertices), Array.from(leftElevatorData!.indices), Array.from(leftElevatorData!.normals), Array.from(leftElevatorData!.colors), null, rightElevator, null, device, pipeline, sampler, whiteView);
-    let rightAileron: RenderNode = new RenderNode(left, Array.from(rightAileronData!.vertices), Array.from(rightAileronData!.indices), Array.from(rightAileronData!.normals), Array.from(rightAileronData!.colors), null, leftElevator, null, device, pipeline, sampler, whiteView);
-    let leftAileron: RenderNode = new RenderNode(right, Array.from(leftAileronData!.vertices), Array.from(leftAileronData!.indices), Array.from(leftAileronData!.normals), Array.from(leftAileronData!.colors), null, rightAileron, null, device, pipeline, sampler, whiteView);
+    let rightAileron: RenderNode = new RenderNode(right, Array.from(rightAileronData!.vertices), Array.from(rightAileronData!.indices), Array.from(rightAileronData!.normals), Array.from(rightAileronData!.colors), null, leftElevator, null, device, pipeline, sampler, whiteView);
+    let leftAileron: RenderNode = new RenderNode(left, Array.from(leftAileronData!.vertices), Array.from(leftAileronData!.indices), Array.from(leftAileronData!.normals), Array.from(leftAileronData!.colors), null, rightAileron, null, device, pipeline, sampler, whiteView);
     let rudder: RenderNode = new RenderNode(rudderM, Array.from(rudderData!.vertices), Array.from(rudderData!.indices), Array.from(rudderData!.normals), Array.from(rudderData!.colors), null, leftAileron, null, device, pipeline, sampler, whiteView);
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
     let sphereM = mat4();
+    // New matrix to track ONLY the earth's rotation (flying), not the plane's tilt
+    let earthRotationM = mat4();
+    
     let sphereNode: RenderNode = new RenderNode(sphereM, Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
     planeNode.sibling = sphereNode;
 
-    let angle = 0;
-    let change = 0;
+    // Control surface angles
+    let currentAileronAngle = 0;
+    let currentElevatorAngle = 0;
+    let currentRudderAngle = 0;
+
     requestAnimationFrame(animate);
 
     let lastTime = performance.now();
@@ -165,16 +171,15 @@ async function main() {
         const dt = (time - lastTime) / 1000; // seconds
         lastTime = time;
 
-        change += 0.02;
-        angle = 45 * Math.cos(change);
         update(dt);
 
-        let { l, r, lE, rE } = tiltAileronsAndElevators(angle);
+        // Pass the calculated angles to the tilt functions
+        let { l, r, lE, rE } = tiltAileronsAndElevators(currentAileronAngle, currentElevatorAngle);
         left = l;
         right = r;
         leftE = lE;
         rightE = rE;
-        rudderM = tiltRudder(angle);
+        rudderM = tiltRudder(currentRudderAngle);
 
         leftAileron.udpateModelMatrix(left);
         rightAileron.udpateModelMatrix(right);
@@ -184,7 +189,8 @@ async function main() {
         sphereNode.udpateModelMatrix(sphereM);
         planeNode.udpateModelMatrix(planeM);
 
-        renderer.renderHierarchy(planeNode, mat4(), view, projection);
+        // Pass the updated lightDir from update() to the renderer
+        renderer.renderHierarchy(planeNode, mat4(), view, projection, lightDir);
 
         requestAnimationFrame(animate);
     }
@@ -195,6 +201,9 @@ async function main() {
     let zAngle = 0;
     let zSpeed = 0
     let xSpeed = 0
+    // Global light direction variable
+    let lightDir: [number, number, number, number] = [0.0, 1.0, 0.0, 0.0];
+
     const planeScale = 0.03;
     const followDistance = -0.5; // how far behind the plane
     const followHeight = 0.2;    // how far above the plane
@@ -212,6 +221,46 @@ async function main() {
             speed = Math.max(0.001, speed - 0.05 * dt); // Min speed 0.001
         }
 
+        // Control Surface Logic
+        const surfaceSpeed = 100 * dt; // degrees per second
+        const returnSpeed = 80 * dt;
+        const maxDeflection = 25;
+
+        // Ailerons (Left/Right arrows)
+        // Left Arrow -> Bank Left -> Left Aileron UP (-), Right Aileron DOWN (+)
+        if (leftPressed) {
+            currentAileronAngle = Math.max(-maxDeflection, currentAileronAngle - surfaceSpeed);
+        } else if (rightPressed) {
+            currentAileronAngle = Math.min(maxDeflection, currentAileronAngle + surfaceSpeed);
+        } else {
+            // Return to 0
+            if (currentAileronAngle > 0) currentAileronAngle = Math.max(0, currentAileronAngle - returnSpeed);
+            else if (currentAileronAngle < 0) currentAileronAngle = Math.min(0, currentAileronAngle + returnSpeed);
+        }
+
+        // Elevators (Up/Down arrows)
+        // Up Arrow -> Pitch Up -> Elevators UP (-)
+        if (upPressed) {
+            currentElevatorAngle = Math.max(-maxDeflection, currentElevatorAngle - surfaceSpeed);
+        } else if (downPressed) {
+            currentElevatorAngle = Math.min(maxDeflection, currentElevatorAngle + surfaceSpeed);
+        } else {
+            if (currentElevatorAngle > 0) currentElevatorAngle = Math.max(0, currentElevatorAngle - returnSpeed);
+            else if (currentElevatorAngle < 0) currentElevatorAngle = Math.min(0, currentElevatorAngle + returnSpeed);
+        }
+
+        // Rudder (Linked to turning/ailerons for now)
+        // Left turn -> Rudder Left (+)
+        if (leftPressed) {
+            currentRudderAngle = Math.min(maxDeflection, currentRudderAngle + surfaceSpeed);
+        } else if (rightPressed) {
+            currentRudderAngle = Math.max(-maxDeflection, currentRudderAngle - surfaceSpeed);
+        } else {
+             if (currentRudderAngle > 0) currentRudderAngle = Math.max(0, currentRudderAngle - returnSpeed);
+            else if (currentRudderAngle < 0) currentRudderAngle = Math.min(0, currentRudderAngle + returnSpeed);
+        }
+
+
         const pitchFactor = Math.min(1, Math.abs(xAngle) / maxPitchDeg);
         if (pitchFactor > 0) {
             const glide = glideBase * pitchFactor * dt;
@@ -226,22 +275,46 @@ async function main() {
         // sphereRadius is 20. We add a small buffer (0.5) so the plane sits on top.
         if (planeY < sphereRadius + 0.15) {
             planeY = sphereRadius + 0.15;
-            
+
             // Auto-level: If hitting the ground nose-down, force the nose up to 0
             if (xAngle < 0) {
                 xAngle = 0;
             }
         }
 
-        //sphereM = mult(rotateZ(-zSpeed), mult(rotateX((speed - Math.abs(zSpeed))), sphereM));
-        //With speed in the x direction (forward) 
+        // Update ONLY the earth rotation based on speed (flying forward)
+        // We accumulate this rotation over time.
+        earthRotationM = mult(rotateX(speed), earthRotationM);
+
+        // Now calculate the final sphereM for rendering:
+        // 1. Apply the accumulated earth rotation (flying)
+        // 2. Apply the plane's tilt (banking) - this rotates the whole world around the plane
+        // Note: The order matters. We want the earth to spin, AND the whole system to tilt.
+        
+        // Apply tilt (banking) to the ALREADY rotated earth
         sphereM = mult(
-            rotateX(-xSpeed),                    // forward/back tilt
-            mult(rotateZ(-zSpeed), mult(rotateX((Math.max(0.005,speed - Math.abs(zSpeed)))), sphereM))
+            rotateX(-xSpeed), 
+            mult(rotateZ(-zSpeed), earthRotationM)
         );
 
-               planeM = mult(translate(0, 0, -planeY), mult(rotateX(90 + xAngle), mult(rotateY(yAngle), mult(rotateZ(zAngle), scalem(planeScale, planeScale, planeScale)))))
+        // LIGHT ATTACHED TO GROUND:
+        // We use earthRotationM (pure earth spin) to rotate the light.
+        // This means the light is fixed to a continent.
+        // We do NOT include the tilt (xSpeed/zSpeed) in the light calculation, 
+        // so the sun doesn't wobble when you bank.
+        const sunFixedToEarth = vec4(0.2, 1.0, 0.2, 0.0); 
+        const worldLightDir = mult(sphereM, sunFixedToEarth);
+        
+        // Normalize
+        const len = Math.sqrt(worldLightDir[0]*worldLightDir[0] + worldLightDir[1]*worldLightDir[1] + worldLightDir[2]*worldLightDir[2]);
+        lightDir = [
+            worldLightDir[0]/len, 
+            worldLightDir[1]/len, 
+            worldLightDir[2]/len, 
+            0.0
+        ];
 
+        planeM = mult(translate(0, 0, -planeY), mult(rotateX(90 + xAngle), mult(rotateY(yAngle), mult(rotateZ(zAngle), scalem(planeScale, planeScale, planeScale)))))
         //With speed in the x direction (forward) 
         /*planeM = mult(
             translate(0, 0, -planeY),
@@ -288,13 +361,14 @@ async function main() {
     let steps = 10
     let MaxAileronAngle = 90;
     let planePitch = 0;
-    
+
     window.addEventListener("keydown", (e) => {
         // Prevent scrolling with arrow keys
-        if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)){
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
             e.preventDefault();
         }
         if (e.key === "w" || e.key === "W") {
+            console.log("w pressed!");
             wPressed = true;
         }
         if (e.key === "s" || e.key === "S") {
@@ -310,7 +384,7 @@ async function main() {
         }
         if (e.key === "ArrowRight") {
             console.log("right pressed!");
-            leftPressed = true;
+            rightPressed = true;
             yAngle = Math.min(45, yAngle + (4.5 / steps));
             zAngle = Math.max(-60, zAngle - (6 / steps));
             //zSpeed = zAngle / 6.0 * speed;
@@ -336,47 +410,44 @@ async function main() {
 
     window.addEventListener("keyup", (e) => {
         if (e.key === "w" || e.key === "W") {
+            console.log("w released!");
             wPressed = false;
         }
         if (e.key === "s" || e.key === "S") {
+            console.log("s released!");
             sPressed = false;
         }
         if (e.key === "ArrowLeft") {
-            if (leftPressed) {
-                console.log("left released!");
-                leftPressed = false;
-            }
+             console.log("left released!");
+             leftPressed = false;
         }
 
         if (e.key === "ArrowRight") {
-            if (rightPressed) {
-                console.log("right released!");
-                rightPressed = false;
-            }
-
+             console.log("right released!");
+             rightPressed = false;
         }
         if (e.key === "ArrowUp") {
-            if (upPressed) {
-                console.log("up released!");
-                upPressed = false;
-            }
+             console.log("up released!");
+             upPressed = false;
         }
         if (e.key === "ArrowDown") {
-            if (downPressed) {
-                console.log("down released!");
-                downPressed = false;
-            }
+             console.log("down released!");
+             downPressed = false;
         }
     })
 }
 
 
-function tiltAileronsAndElevators(degrees: number): { l: Mat, r: Mat, lE: Mat, rE: Mat } {
-
-    let leftAileronTilt = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]), mult(rotateX(degrees), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2])))
-    let rightAileronTilt = mult(translate(rightAileronTransform[0], -rightAileronTransform[1], rightAileronTransform[2]), mult(rotateX(degrees), translate(-rightAileronTransform[0], rightAileronTransform[1], -rightAileronTransform[2])))
-    let leftElevatorTilt = mult(translate(leftElevatorTransform[0], -leftElevatorTransform[1], leftElevatorTransform[2]), mult(rotateX(degrees), translate(-leftElevatorTransform[0], leftElevatorTransform[1], -leftElevatorTransform[2])))
-    let rightElevatorTilt = mult(translate(rightElevatorTransform[0], -rightElevatorTransform[1], rightElevatorTransform[2]), mult(rotateX(degrees), translate(-rightElevatorTransform[0], rightElevatorTransform[1], -rightElevatorTransform[2])))
+function tiltAileronsAndElevators(aileronAngle: number, elevatorAngle: number): { l: Mat, r: Mat, lE: Mat, rE: Mat } {
+    // Left Aileron: Up is negative rotation
+    // Right Aileron: Down is positive rotation (opposite of left)
+    let leftAileronTilt = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]), mult(rotateX(aileronAngle), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2])))
+    
+    // Right aileron moves opposite to left
+    let rightAileronTilt = mult(translate(rightAileronTransform[0], -rightAileronTransform[1], rightAileronTransform[2]), mult(rotateX(-aileronAngle), translate(-rightAileronTransform[0], rightAileronTransform[1], -rightAileronTransform[2])))
+    
+    let leftElevatorTilt = mult(translate(leftElevatorTransform[0], -leftElevatorTransform[1], leftElevatorTransform[2]), mult(rotateX(elevatorAngle), translate(-leftElevatorTransform[0], leftElevatorTransform[1], -leftElevatorTransform[2])))
+    let rightElevatorTilt = mult(translate(rightElevatorTransform[0], -rightElevatorTransform[1], rightElevatorTransform[2]), mult(rotateX(elevatorAngle), translate(-rightElevatorTransform[0], rightElevatorTransform[1], -rightElevatorTransform[2])))
     return {
         l: leftAileronTilt,
         r: rightAileronTilt,
@@ -386,7 +457,7 @@ function tiltAileronsAndElevators(degrees: number): { l: Mat, r: Mat, lE: Mat, r
 }
 
 function tiltRudder(degrees: number): Mat {
-    return mult(translate(rudderTransform[0], -rudderTransform[1], rudderTransform[2]), mult(rotateY(degrees), translate(-rudderTransform[0], rudderTransform[1], -rudderTransform[2])));
+    return mult(translate(rudderTransform[0], -rudderTransform[1], rudderTransform[2]), mult(rotateY(-degrees), translate(-rudderTransform[0], rudderTransform[1], -rudderTransform[2])));
 }
 
 

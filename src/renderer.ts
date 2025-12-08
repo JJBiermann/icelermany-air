@@ -36,8 +36,11 @@ export class Renderer {
 
     private config!: RendererConfig;
     private lightTheta = 0;
-    private lightDir: [number, number, number, number] = [0.0, -0.5, 1.0, 0.0];
-    private lightSpinEnabled = true;
+    // Light travels in +Z direction (from plane towards earth). 
+    // This creates a "Sun" that is fixed in the universe.
+    // As the earth rotates (when you fly), you will see day/night cycles.
+    private lightDir: [number, number, number, number] = [0.2, 0.2, 1.0, 0.0];
+    private lightSpinEnabled = false;
 
     constructor(config: RendererConfig) {
         this.config = {
@@ -185,9 +188,12 @@ export class Renderer {
         this.device.queue.submit([encoder.finish()])
     }
 
-    public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat) {
-        // Rotate light on a horizontal ring around Y (no tilt); can be paused via toggle
-        if (this.lightSpinEnabled) {
+    public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat, lightDirection?: [number, number, number, number]) {
+        // If a custom light direction is provided (e.g. rotating with earth), use it.
+        if (lightDirection) {
+            this.lightDir = lightDirection;
+        } else if (this.lightSpinEnabled) {
+            // Fallback to spinning if enabled and no custom dir provided
             this.lightTheta += 0.002;
             const lx = Math.cos(this.lightTheta);
             const lz = Math.sin(this.lightTheta);
@@ -229,12 +235,12 @@ export class Renderer {
 
         // Pack matrices followed by lighting params (matches shaders.wgsl Uniforms layout)
             const lightDirection = this.lightDir;
-            const lightColor = [1.0, 0.98, 0.94, 0.0]; // ~6500K sunlight tint
+            const lightColor = [1.0, 1.0, 1.0, 0.0]; // ~6500K sunlight tint
             const k_d_factor = 0.5;
             const k_s_factor = 0.2;   // softer, less plastic specular
             const shininess = 64.0;   // tighter highlight like sun
-            const L_e_factor = 0.5;   // no emissive
-            const L_a_factor = 0.03;  // low ambient fill
+            const L_e_factor = 0.4;   // no emissive
+            const L_a_factor = 0.4;  // low ambient fill
 
         const uniform : number[] = [
             ...Array.from(flatten(worldModel)),
