@@ -18,7 +18,6 @@ const leftElevatorTransform = vec3(1.0151, 0.048431, -4.0851);
 const rightElevatorTransform = vec3(-1.0459, 0.047272, -4.0859);
 const rudderTransform = vec3(0.009496, 0.59494, -4.2548);
 
-
 // Model matrices for each part
 let left = mat4();
 let right = mat4();
@@ -26,35 +25,13 @@ let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
 let planeX = 0;
-let planeY = 25;
+let planeY = 30;
 let planeZ = 0;
-let lat = 0;
-let lon = 0;
-let Y = 0;
-let planeXRotation = mat4();
-let planeZRotation = mat4();
-let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
 let planeM = mult(planeTranslation, rotateX(90));
 
 
-var eye = vec4(0, -10, -30, 1);      // eye is a point
-var lookat = vec4(0, 0, 0, 1);     // lookat is a point  -> eye - point --> Direction looking at
-var up = vec4(0, 1, 0, 0);
-//let view = lookAt(eye, lookat, up);
-
-//let eyeWorld = mult(planeM, eye);
-//let lookAtWorld = mult(planeM, lookat);
-//let upWorld = mult(planeM, up);
-
-/*let view = lookAt(
-    vec3(eyeWorld[0], eyeWorld[1], eyeWorld[2]),
-    vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
-    vec3(upWorld[0], upWorld[1], upWorld[2])
-);
-*/
-
-var eye = vec3(0, 0, -40);
+var eye = vec3(0, -4, -50);
 var lookat = vec3(0, 0, 0);
 var up = vec3(0, 1, 0);
 
@@ -131,11 +108,6 @@ async function main() {
         console.warn('Falling back to white texture for earth because load failed', err);
     }
 
-    // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
-
-
-
-
     //let modelMatrix: Mat = mult(translate(0, 0, 0), );
     //let modelMatrix = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]),mult(rotateX(0), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2]))); //translate(-2.0116, 0.042162, +0.54629))
     // Pinhole camera with 45° vertical FOV
@@ -207,28 +179,14 @@ async function main() {
         requestAnimationFrame(animate);
     }
 
-
-    /*
-    renderer.updateUniformBuffer(Array.from(coolUniformData));
-    if (objData) {
-        renderer.updatePositionBuffer(Array.from(objData.vertices));
-        //console.log("vertices: ", objData.vertices);
-        renderer.updateColorBuffer(Array.from(objData.colors));
-        renderer.updateIndicesBuffer(Array.from(objData.indices));
-        renderer.updateNormals(Array.from(objData.normals));
-        // also need to render the normals objData.normals
-        renderer.render(objData.indices.length);
-    }
-    */
     let speed = 0.1
     let yAngle = 0;
     let zAngle = 0;
     let zSpeed = 0
-    let xSpeed = 0;
     function update(dt: number) {
-        sphereM = mult(rotateZ(-zSpeed), mult(rotateX((0.1 - Math.abs(zSpeed))), sphereM));
+        sphereM = mult(rotateZ(-zSpeed), mult(rotateX((speed - Math.abs(zSpeed))), sphereM));
 
-        planeM = mult(translate(0, 0, -22), mult(rotateX(90), mult(rotateY(yAngle), rotateZ(zAngle))));
+        planeM = mult(translate(0, 0, -30), mult(rotateX(90), mult(rotateY(yAngle), rotateZ(zAngle))));
     }
 
 
@@ -242,7 +200,7 @@ async function main() {
                 leftPressed = true;
                 yAngle = Math.max(-45, yAngle - (45 / steps));
                 zAngle = Math.min(60, zAngle + (60 / steps));
-                zSpeed = zAngle / 60 * 0.1;
+                zSpeed = zAngle / 60 * speed;
 
         }
         if (e.key === "ArrowRight") {
@@ -250,7 +208,7 @@ async function main() {
                 leftPressed = true;
                 yAngle = Math.min(45, yAngle + (45 / steps));
                 zAngle = Math.max(-60, zAngle - (60 / steps));
-                zSpeed = zAngle / 60 * 0.1;
+                zSpeed = zAngle / 60 * speed;
         }
     });
 
@@ -350,32 +308,4 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
 
     // Return in the order that matches RenderNode ctor: vertices, indices, normals, colors
     return { positions, indices, normals, colors, uvs };
-}
-
-function transformVec3(m: any, v: any) {
-    return vec3(
-        m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
-        m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
-        m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2]
-    );
-}
-
-/* 
-P = current plane position
-N = sphere normal at P
-F = direction the plane wants to fly (e.g., local forward vector)
-speed = movement speed
-dt = timestep
-R = sphere radius
-*/
-
-function moveOnSphere(P: Vec, F: Vec, R: number, dt: number, speed: number): Vec {
-    const N = normalize(P);                   // sphere normal
-    let T = subtract(F, scale(dot(F, N), N)); // tangent direction
-    T = normalize(T);
-
-    let Pnew = add(P, scale(speed * dt, T));  // move slightly
-    Pnew = scale(R, normalize(Pnew));         // reproject to sphere
-    console.log("Pnew!", Pnew)
-    return Pnew;
 }
