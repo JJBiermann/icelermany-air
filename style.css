@@ -44,10 +44,10 @@ body, html {
     pointer-events: auto; /* Re-enable interaction for UI elements */
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
-    padding: 40px 60px; /* Doubled padding */
-    border-radius: 32px; /* Doubled border radius */
-    border: 2px solid rgba(255, 255, 255, 0.1); /* Doubled border width */
-    box-shadow: 0 8px 12px rgba(0,0,0,0.3); /* Doubled shadow */
+    padding: 2vmin 3vmin;
+    border-radius: 2vmin;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 1vmin 2vmin rgba(0,0,0,0.3);
     transition: opacity 0.3s ease;
 }
 
@@ -57,9 +57,9 @@ body, html {
 
 .hud-top-left h1 {
     margin: 0;
-    font-size: 4.4rem; /* Doubled font size */
+    font-size: 5vmin;
     font-weight: 700;
-    letter-spacing: 2px; /* Doubled letter spacing */
+    letter-spacing: 0.2vmin;
     text-transform: uppercase;
     background: linear-gradient(45deg, #fff, #aaa);
     -webkit-background-clip: text;
@@ -67,15 +67,15 @@ body, html {
 }
 
 .hud-top-left p {
-    margin: 16px 0 0 0; /* Doubled margin */
-    font-size: 2.2rem; /* Doubled font size */
+    margin: 1vmin 0 0 0;
+    font-size: 2.5vmin;
     color: #ccc;
 }
 
 .hud-top-left .credits {
-    font-size: 1.4rem; /* Smaller than the subtitle */
+    font-size: 1.5vmin;
     color: #aaa;
-    margin-top: 8px;
+    margin-top: 0.5vmin;
     font-style: italic;
 }
 
@@ -87,92 +87,34 @@ body, html {
 }
 
 .hud-bottom-left h3 {
-    margin: 0 0 32px 0; /* Doubled margin */
-    font-size: 2.4rem; /* Doubled font size */
+    margin: 0 0 2vmin 0;
+    font-size: 3vmin;
     text-transform: uppercase;
     color: #888;
-    border-bottom: 2px solid rgba(255,255,255,0.1); /* Doubled border width */
-    padding-bottom: 20px; /* Doubled padding */
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 1vmin;
 }
 
 .hud-bottom-left ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    font-size: 2.2rem; /* Doubled font size */
+    font-size: 2vmin;
 }
 
 .hud-bottom-left li {
-    margin-bottom: 24px; /* Doubled margin */
+    margin-bottom: 1.5vmin;
     display: flex;
     align-items: center;
-    gap: 24px; /* Doubled gap */
+    gap: 1.5vmin;
 }
 
 .key {
     display: inline-block;
     background: rgba(255,255,255,0.15);
-    border: 2px solid rgba(255,255,255,0.2); /* Doubled border width */
-    border-radius: 12px; /* Doubled border radius */
-    padding: 8px 20px; /* Doubled padding */
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 0.8vmin;
+    padding: 0.5vmin 1.2vmin;
     font-family: monospace;
     font-weight: bold;
-    font-size: 2rem; /* Doubled font size */
-    min-width: 40px; /* Doubled min-width */
-    text-align: center;
-    box-shadow: 0 6px 0 rgba(0,0,0,0.2); /* Doubled shadow */
-}
-
-body {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 20px;
-    background-color: #f0f0f0;
-}
-
-.controls-section {
-    display: flex;
-    gap: 30px;
-    flex-wrap: wrap;
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-label {
-    font-weight: bold;
-    color: #333;
-}
-
-select {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #fff;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-}
-
-.checkbox-group label {
-    margin: 0;
-}
+    font-size: 1.
