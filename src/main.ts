@@ -2,7 +2,7 @@ import { sizeof, type Mat } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse, normalize } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -157,7 +157,7 @@ async function main() {
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
-    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, whiteView);
+    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
     planeNode.sibling = sphereNode;
 
     let angle = 0;
@@ -276,8 +276,7 @@ async function main() {
     });
     */
 
-
-    let planePos = vec3(0, 20, -30);
+    let planePos;
     let planeDir = vec3(0, 0, 1);  // Forward direction in world space
     let yaw = 0;   // rotate left/right
     let pitch = 0; // nose up/down
@@ -288,69 +287,65 @@ async function main() {
 
     // After: keep a mutable translation
     let dx = 0;
-    let dy = 0;
-    let dz = 0;
+    let dy = 10;
+    let dz = 10;
     let tilt = 0;
     let angularSpeed = (2 * Math.PI * planeY) / 360;
-
+    var lon: number = 0;
+    var lat: number = 0;
+    let yawInput = 0;
+    let pitchInput = 0;
 
     function updatePlane(dt: number) {
+    // Update yaw/pitch
+    lon += yawInput * dt;
+    lat += pitchInput * dt;
 
-        // Build orientation matrix from yaw & pitch
-        planeZRotation = rotateZ(tilt );
-        planeYRotation = rotateY(-tilt/ 2)
+    lat = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, lat));
 
-        // orientation = yaw * pitch
-        const orientation = mult(planeYRotation, planeZRotation);
+    const R = 40;
 
-        // Extract the forward direction (negative z-axis in most engines)
-        const forward = vec3(
-            orientation[2][0],
-            orientation[2][1],
-            orientation[2][2]
-        );
+    // Compute spherical position
+    const x = R * Math.cos(lat) * Math.sin(lon);
+    const y = R * Math.sin(lat);
+    const z = R * Math.cos(lat) * Math.cos(lon);
 
-        // Update position
-        planeX += dx * angularSpeed * dt;
-        planeY += dy * angularSpeed * dt;
-        planeZ += dz * angularSpeed * dt;
+    planePos = vec3(x, y, z);
 
-        // Optional: banking visuals
-        const rollMat = rotateZ(roll);
+    // Forward direction from spherical coords
+    const forward = normalize(vec3(
+        Math.cos(lat) * Math.cos(lon),
+        0,
+        -Math.cos(lat) * Math.sin(lon)
+    ));
 
-        // Construct the final model matrix
-        const translation = translate(planePos[0], planePos[1], planePos[2]);
+    // Orientation (yaw, pitch, roll)
+    const yawMat   = rotateY(lon);
+    const pitchMat = rotateX(lat);
+    const rollMat  = rotateZ(roll);
 
+    const orientation = mult(yawMat, mult(pitchMat, rollMat));
 
+    // Camera offset
+    const localCamOffset = vec3(0, 8, -20);
+    const worldOffset = transformVec3(orientation, localCamOffset);
 
-        // Local camera offset: behind + above
-        const localCamOffset = vec3(0, 8, -20);
+    eye = add(planePos, worldOffset);
+    lookat = add(planePos, forward);
+    up = vec3(0, 1, 0);
 
-        // Convert offset to world space using plane orientation
-        const worldOffset = transformVec3(orientation, localCamOffset);
+    view = lookAt(eye, lookat, up);
 
-        // Camera position follows plane
-        eye = add(planePos, worldOffset);
-
-        // Forward direction already computed above
-        const lookat = add(planePos, forward);
-
-        // Rotate the up vector with the plane so the camera banks with it
-//        up = transformVec3(orientation, vec3(0, 1, 0));
-        up = vec3(0, 1, 0);
-        view = lookAt(eye, lookat, up);
+    // MODEL MATRIX
+    const translation = translate(x, y, z);
+    planeM = mult(translation, orientation);
+}
 
 
-        //eye = vec3(0, planePos[1], planePos[2] - 30);      // eye is a point
-        //lookat = vec3(planePos[0], planePos[1], planePos[2]);
-        //var up = vec3(0, 1, 0);
-        //view = lookAt(eye, lookat, up);
-        planeM = mult(translation, mult(planeYRotation, mult(planeZRotation, rollMat)));
-    }
-
+    /*
     let tiltChange = 5;
     window.addEventListener("keydown", (e) => {
-       switch (e.key) {
+        switch (e.key) {
             case "ArrowLeft":
                 // move left in x
                 tilt = Math.min(90, tilt + tiltChange);
@@ -370,6 +365,23 @@ async function main() {
             case "ArrowDown":
                 dy -= moveStep * 2; // move down in y
                 break;
+        }
+    });*/
+
+
+
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") yawInput = -1;
+        if (e.key === "ArrowRight") yawInput = +1;
+        if (e.key === "ArrowUp") pitchInput = +1;
+        if (e.key === "ArrowDown") pitchInput = -1;
+    });
+
+    window.addEventListener("keyup", (e) => {
+        if (e.key.includes("Arrow")) {
+            yawInput = 0;
+            pitchInput = 0;
         }
     });
 }
@@ -456,8 +468,8 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
 
 function transformVec3(m: any, v: any) {
     return vec3(
-        m[0][0]*v[0] + m[0][1]*v[1] + m[0][2]*v[2],
-        m[1][0]*v[0] + m[1][1]*v[1] + m[1][2]*v[2],
-        m[2][0]*v[0] + m[2][1]*v[1] + m[2][2]*v[2]
+        m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+        m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+        m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2]
     );
 }
