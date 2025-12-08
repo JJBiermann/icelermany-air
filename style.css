@@ -3,39 +3,124 @@ body, html {
     padding: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden; /* Prevents scrollbars */
-    font-family: Arial, sans-serif;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #1a1a1a;
+    color: white;
 }
 
 #canvas-container {
-    width: 100%;
-    height: 100%;
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 1;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
 }
 
 #my-canvas {
     display: block;
     width: 100%;
     height: 100%;
-    background-color: white;
 }
 
-.ui-overlay {
+/* UI Overlay Layer */
+#ui-layer {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     z-index: 10;
-    background: rgba(255, 255, 255, 0.8);
-    padding: 15px;
-    border-radius: 8px;
     pointer-events: none; /* Let clicks pass through to canvas */
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
-.ui-overlay button {
-    pointer-events: auto; /* Re-enable clicks for buttons */
+.hud-panel {
+    pointer-events: auto; /* Re-enable interaction for UI elements */
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    padding: 40px 60px; /* Doubled padding */
+    border-radius: 32px; /* Doubled border radius */
+    border: 2px solid rgba(255, 255, 255, 0.1); /* Doubled border width */
+    box-shadow: 0 8px 12px rgba(0,0,0,0.3); /* Doubled shadow */
+    transition: opacity 0.3s ease;
+}
+
+.hud-top-left {
+    align-self: flex-start;
+}
+
+.hud-top-left h1 {
+    margin: 0;
+    font-size: 4.4rem; /* Doubled font size */
+    font-weight: 700;
+    letter-spacing: 2px; /* Doubled letter spacing */
+    text-transform: uppercase;
+    background: linear-gradient(45deg, #fff, #aaa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hud-top-left p {
+    margin: 16px 0 0 0; /* Doubled margin */
+    font-size: 2.2rem; /* Doubled font size */
+    color: #ccc;
+}
+
+.hud-top-left .credits {
+    font-size: 1.4rem; /* Smaller than the subtitle */
+    color: #aaa;
+    margin-top: 8px;
+    font-style: italic;
+}
+
+.hud-bottom-left {
+    align-self: flex-start;
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.hud-bottom-left h3 {
+    margin: 0 0 32px 0; /* Doubled margin */
+    font-size: 2.4rem; /* Doubled font size */
+    text-transform: uppercase;
+    color: #888;
+    border-bottom: 2px solid rgba(255,255,255,0.1); /* Doubled border width */
+    padding-bottom: 20px; /* Doubled padding */
+}
+
+.hud-bottom-left ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 2.2rem; /* Doubled font size */
+}
+
+.hud-bottom-left li {
+    margin-bottom: 24px; /* Doubled margin */
+    display: flex;
+    align-items: center;
+    gap: 24px; /* Doubled gap */
+}
+
+.key {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.2); /* Doubled border width */
+    border-radius: 12px; /* Doubled border radius */
+    padding: 8px 20px; /* Doubled padding */
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 2rem; /* Doubled font size */
+    min-width: 40px; /* Doubled min-width */
+    text-align: center;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.2); /* Doubled shadow */
 }
 
 body {

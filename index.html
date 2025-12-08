@@ -2,21 +2,33 @@
 <html>
 
 <head>
-    <title>02561 Worksheet 06 - P1</title>
+    <meta charset="UTF-8">
+    <title>Icelermany Air - Flight Simulator</title>
     <script type="module" src="./src/main.ts"></script>
     <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
-  <h1>Final Project - Computer Graphics</h1>
-  <h2>By Oskar Thorir and Justus Biermann</h2>
-  <p> Arrow keys for steering, w: throttle up, s: throttle down</p>
     <div id="canvas-container">
-       <canvas id="my-canvas" width="700" height="512">
-            Please use a browser that supports HTML5 canvas.
-        </canvas>
+       <canvas id="my-canvas"></canvas>
     </div>
-    <button id="toggle-circle-light">Circle light on/off</button>
+
+    <div id="ui-layer">
+        <div class="hud-panel hud-top-left">
+            <h1>Icelermany Air</h1>
+            <p>Flight Simulator</p>
+            <p class="credits">Created by Justus Biermann and Óskar Þórir Bjarnason</p>
+        </div>
+        
+        <div class="hud-panel hud-bottom-left">
+            <h3>Controls</h3>
+            <ul>
+                <li><span class="key">&uarr;</span> <span class="key">&darr;</span> Pitch</li>
+                <li><span class="key">&larr;</span> <span class="key">&rarr;</span> Roll & Turn</li>
+                <li><span class="key">W</span> <span class="key">S</span> Throttle</li>
+            </ul>
+        </div>
+    </div>
 </body>
 
 </html>
