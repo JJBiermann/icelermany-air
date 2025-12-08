@@ -157,7 +157,7 @@ async function main() {
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
-    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), null, null, dev, pipeline);
+    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, whiteView);
     planeNode.sibling = sphereNode;
 
     let angle = 0;
