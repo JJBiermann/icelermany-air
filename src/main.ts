@@ -1,8 +1,9 @@
 import { sizeof, type Mat } from "./utils/MV";
+import type { Vec } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse, normalize } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse, normalize, cross, subtract, scale, dot } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -25,14 +26,15 @@ let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
 let planeX = 0;
-let planeY = 20;
-let planeZ = -30;
+let planeY = 30;
+let planeZ = 0;
 let planeXRotation = mat4();
 let planeZRotation = mat4();
 let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
-let planeM = planeTranslation;
+let planeM = mult(rotateY(45), planeTranslation);
 
+/*
 var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
 var lookat = vec4(planeX, planeY, planeZ, 1);     // lookat is a point  -> eye - point --> Direction looking at
 var up = vec4(0, 1, 0, 0);
@@ -47,6 +49,13 @@ let view = lookAt(
     vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
     vec3(upWorld[0], upWorld[1], upWorld[2])
 );
+*/
+
+var eye = vec3(0, 0, -80);
+var lookat = vec3(0, 0, 0);
+var up = vec3(0, 1, 0);
+
+var view = lookAt(eye, lookat, up);
 
 
 async function main() {
@@ -162,18 +171,17 @@ async function main() {
 
     let angle = 0;
     let change = 0;
-    requestAnimationFrame(update);
+    requestAnimationFrame(animate);
 
     let lastTime = performance.now();
-    function update(time: number) {
+    function animate(time: number) {
 
         const dt = (time - lastTime) / 1000; // seconds
         lastTime = time;
 
         change += 0.02;
         angle = 45 * Math.cos(change);
-
-        updatePlane(dt);
+        update(dt);
         /*
         TODO: THIS IS STILL NEEDED
         let { l, r, lE, rE } = tiltAileronsAndElevators(angle);
@@ -205,9 +213,8 @@ async function main() {
         //sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
-        requestAnimationFrame(update);
+        requestAnimationFrame(animate);
     }
-    requestAnimationFrame(update);
 
 
     /*
@@ -286,59 +293,22 @@ async function main() {
     const moveStep = 1; // how much to move per key press
 
     // After: keep a mutable translation
-    let dx = 0;
-    let dy = 10;
-    let dz = 10;
-    let tilt = 0;
-    let angularSpeed = (2 * Math.PI * planeY) / 360;
-    var lon: number = 0;
-    var lat: number = 0;
-    let yawInput = 0;
-    let pitchInput = 0;
+    // Globals you can tweak:
+let lat = 0;                     // radians
+let lon = 0;
+let latSpeed = 1;              // radians per second
+let lonSpeed = 1;
 
-    function updatePlane(dt: number) {
-    // Update yaw/pitch
-    lon += yawInput * dt;
-    lat += pitchInput * dt;
+const GlobeRadius = 20;
 
-    lat = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, lat));
+// Output:
+let planeModelMatrix = mat4();
 
-    const R = 40;
 
-    // Compute spherical position
-    const x = R * Math.cos(lat) * Math.sin(lon);
-    const y = R * Math.sin(lat);
-    const z = R * Math.cos(lat) * Math.cos(lon);
-
-    planePos = vec3(x, y, z);
-
-    // Forward direction from spherical coords
-    const forward = normalize(vec3(
-        Math.cos(lat) * Math.cos(lon),
-        0,
-        -Math.cos(lat) * Math.sin(lon)
-    ));
-
-    // Orientation (yaw, pitch, roll)
-    const yawMat   = rotateY(lon);
-    const pitchMat = rotateX(lat);
-    const rollMat  = rotateZ(roll);
-
-    const orientation = mult(yawMat, mult(pitchMat, rollMat));
-
-    // Camera offset
-    const localCamOffset = vec3(0, 8, -20);
-    const worldOffset = transformVec3(orientation, localCamOffset);
-
-    eye = add(planePos, worldOffset);
-    lookat = add(planePos, forward);
-    up = vec3(0, 1, 0);
-
-    view = lookAt(eye, lookat, up);
-
-    // MODEL MATRIX
-    const translation = translate(x, y, z);
-    planeM = mult(translation, orientation);
+function update(dt: number) {
+    speed = 50;
+    planeM = mult(rotateX(dt * -speed), planeM);
+    planeM = mult(rotateZ(dt * -speed), planeM);
 }
 
 
@@ -472,4 +442,24 @@ function transformVec3(m: any, v: any) {
         m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
         m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2]
     );
+}
+
+/* 
+P = current plane position
+N = sphere normal at P
+F = direction the plane wants to fly (e.g., local forward vector)
+speed = movement speed
+dt = timestep
+R = sphere radius
+*/
+
+function moveOnSphere(P: Vec, F: Vec , R: number, dt: number, speed: number) : Vec{
+    const N = normalize(P);                   // sphere normal
+    let T = subtract(F, scale(dot(F, N), N)); // tangent direction
+    T = normalize(T);
+    
+    let Pnew = add(P, scale(speed * dt, T));  // move slightly
+    Pnew = scale(R, normalize(Pnew));         // reproject to sphere
+    console.log("Pnew!", Pnew) 
+    return Pnew;
 }
