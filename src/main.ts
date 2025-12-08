@@ -2,7 +2,7 @@ import { sizeof, type Mat } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -24,12 +24,30 @@ let right = mat4();
 let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
-let planeM = mat4();
+let planeX = 0;
+let planeY = 20;
+let planeZ = -30;
+let planeXRotation = mat4();
+let planeZRotation = mat4();
+let planeYRotation = mat4();
+let planeTranslation = translate(planeX, planeY, planeZ);
+let planeM = planeTranslation;
 
-var eye = vec3(0, 15, -30);      // eye is a point
-var lookat = vec3(0, 0, 0);     // lookat is a point  -> eye - point --> Direction looking at
-var up = vec3(0, 1, 0);
-let view = lookAt(eye, lookat, up);
+var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
+var lookat = vec4(planeX, planeY, planeZ, 1);     // lookat is a point  -> eye - point --> Direction looking at
+var up = vec4(0, 1, 0, 0);
+//let view = lookAt(eye, lookat, up);
+
+let eyeWorld = mult(mult(planeXRotation, planeTranslation), eye);
+let lookAtWorld = mult(mult(planeXRotation, planeTranslation), lookat);
+let upWorld = mult(mult(planeXRotation, planeTranslation), up);
+
+let view = lookAt(
+    vec3(eyeWorld[0], eyeWorld[1], eyeWorld[2]),
+    vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
+    vec3(upWorld[0], upWorld[1], upWorld[2])
+);
+
 
 async function main() {
     const renderer: Renderer = new Renderer({
@@ -63,10 +81,6 @@ async function main() {
     // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
 
 
-    // After: keep a mutable translation
-    let tx = 0;
-    let ty = 0;
-    let tz = 0;
 
 
     //let modelMatrix: Mat = mult(translate(0, 0, 0), );
@@ -88,7 +102,7 @@ async function main() {
 
 
     // create the sphere with radius 15, 32 stacks and 64 slices
-    const sphere = generateSphere(50, 32, 64);
+    const sphere = generateSphere(20, 32, 64);
 
     const dev = renderer.getDevice();
     const pipeline = renderer.getPipeline();
@@ -103,34 +117,52 @@ async function main() {
     let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, rudder, dev, pipeline);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
-        let sphereM = translate(0, -60, 40);
-    let sphereNode: RenderNode = new RenderNode(sphereM, Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), null, null, dev, pipeline);
+    let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), null, null, dev, pipeline);
     planeNode.sibling = sphereNode;
 
     let angle = 0;
     let change = 0;
-    update();
-    function update() {
+    requestAnimationFrame(update);
+
+    let lastTime = performance.now();
+    function update(time: number) {
+
+        const dt = (time - lastTime) / 1000; // seconds
+        lastTime = time;
+
         change += 0.02;
         angle = 45 * Math.cos(change);
 
+        updatePlane(dt);
+        /*
+        TODO: THIS IS STILL NEEDED
         let { l, r, lE, rE } = tiltAileronsAndElevators(angle);
         left = l;
         right = r;
         leftE = lE;
         rightE = rE;
         rudderM = tiltRudder(angle);
-        
+
         leftAileron.udpateModelMatrix(left);
         rightAileron.udpateModelMatrix(right);
         leftElevator.udpateModelMatrix(leftE);
         rightElevator.udpateModelMatrix(rightE);
         rudder.udpateModelMatrix(rudderM);
+        */
         planeNode.udpateModelMatrix(planeM);
         // Spin the sphere slowly around Y and have it little bit down 
-            
-            sphereM = mult(translate(0, -70, 40), rotateX(change * 20));
-        sphereNode.udpateModelMatrix(sphereM);
+        /*eyeWorld = mult(planeTranslation, eye);
+        lookAtWorld = mult( planeTranslation, lookat);
+        upWorld = mult( planeTranslation,  up);
+
+        view = lookAt(
+            vec3(eyeWorld[0], eyeWorld[1], eyeWorld[2]),
+            vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
+            vec3(upWorld[0], upWorld[1], upWorld[2])
+        );
+        */
+        //sphereM = mult(translate(0, -70, 40), rotateX(change * 20));
+        //sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
         requestAnimationFrame(update)
@@ -150,18 +182,35 @@ async function main() {
     }
     */
 
+    /*
     const moveStep = 1; // how much to move per key press
+
+    // After: keep a mutable translation
+    let tx = 0;
+    let ty = 0;
+    let tz = 0;
+    let tilt = 0;
+    let speed = (2 * Math.PI * planeY) / 10;
 
     window.addEventListener("keydown", (event: KeyboardEvent) => {
         let moved = false;
 
+
+
         switch (event.key) {
             case "ArrowLeft":
-                tx += moveStep * 2; // move left in x
+                // move left in x
+                tilt = Math.min(90, tilt + 10);
+                planeX = Math.min(1, tilt * 1 / 45);
+                planeZRotation = rotateZ(tilt);
+                planeYRotation = rotateY(-tilt / 2)
                 moved = true
                 break;
             case "ArrowRight":
-                tx -= moveStep * 2; // move right in x
+                tilt = Math.max(-90, tilt - 10);
+                planeX = Math.max(-1, tilt * 1 / 45);
+                planeZRotation = rotateZ(tilt);
+                planeYRotation = rotateY(-tilt / 2)
                 moved = true
                 break;
             case "ArrowUp":
@@ -175,8 +224,111 @@ async function main() {
         }
 
         if (moved) {
-            planeM = mult(rotateZ(tx), rotateX(ty));
+            //planeXRotation = rotateX(ty);
+            planeXRotation = mat4();
+            //planeZRotation = rotateZ(tx);
+            planeTranslation = translate(planeX, planeY, planeZ);
 
+            planeM = mult(planeTranslation, mult(planeYRotation, mult(planeZRotation, planeXRotation)));
+
+        }
+    });
+    */
+
+
+    let planePos = vec3(0, 20, -30);
+    let planeDir = vec3(0, 0, 1);  // Forward direction in world space
+    let yaw = 0;   // rotate left/right
+    let pitch = 0; // nose up/down
+    let roll = 0;  // tilting the wings
+    let speed = 10; // units per second
+
+    const moveStep = 1; // how much to move per key press
+
+    // After: keep a mutable translation
+    let dx = 0;
+    let dy = 0;
+    let dz = 0;
+    let tilt = 0;
+    let angularSpeed = (2 * Math.PI * planeY) / 360;
+
+
+    function updatePlane(dt: number) {
+
+        // Build orientation matrix from yaw & pitch
+        planeZRotation = rotateZ(tilt );
+        planeYRotation = rotateY(-tilt/ 2)
+
+        // orientation = yaw * pitch
+        const orientation = mult(planeYRotation, planeZRotation);
+
+        // Extract the forward direction (negative z-axis in most engines)
+        const forward = vec3(
+            orientation[2][0],
+            orientation[2][1],
+            orientation[2][2]
+        );
+
+        // Update position
+        planeX += dx * angularSpeed * dt;
+        planeY += dy * angularSpeed * dt;
+        planeZ += dz * angularSpeed * dt;
+
+        // Optional: banking visuals
+        const rollMat = rotateZ(roll);
+
+        // Construct the final model matrix
+        const translation = translate(planePos[0], planePos[1], planePos[2]);
+
+
+
+        // Local camera offset: behind + above
+        const localCamOffset = vec3(0, 8, -20);
+
+        // Convert offset to world space using plane orientation
+        const worldOffset = transformVec3(orientation, localCamOffset);
+
+        // Camera position follows plane
+        eye = add(planePos, worldOffset);
+
+        // Forward direction already computed above
+        const lookat = add(planePos, forward);
+
+        // Rotate the up vector with the plane so the camera banks with it
+//        up = transformVec3(orientation, vec3(0, 1, 0));
+        up = vec3(0, 1, 0);
+        view = lookAt(eye, lookat, up);
+
+
+        //eye = vec3(0, planePos[1], planePos[2] - 30);      // eye is a point
+        //lookat = vec3(planePos[0], planePos[1], planePos[2]);
+        //var up = vec3(0, 1, 0);
+        //view = lookAt(eye, lookat, up);
+        planeM = mult(translation, mult(planeYRotation, mult(planeZRotation, rollMat)));
+    }
+
+    let tiltChange = 5;
+    window.addEventListener("keydown", (e) => {
+       switch (e.key) {
+            case "ArrowLeft":
+                // move left in x
+                tilt = Math.min(90, tilt + tiltChange);
+                dx = Math.min(1, tilt * 1 / 45);
+                planeZRotation = rotateZ(tilt);
+                planeYRotation = rotateY(-tilt / 2)
+                break;
+            case "ArrowRight":
+                tilt = Math.max(-90, tilt - tiltChange);
+                dx = Math.max(-1, tilt * 1 / 45);
+                planeZRotation = rotateZ(tilt);
+                planeYRotation = rotateY(-tilt / 2)
+                break;
+            case "ArrowUp":
+                dy += moveStep * 2; // move up in y
+                break;
+            case "ArrowDown":
+                dy -= moveStep * 2; // move down in y
+                break;
         }
     });
 }
@@ -256,4 +408,12 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
 
     // Return in the order that matches RenderNode ctor: vertices, indices, normals, colors
     return { positions, indices, normals, colors };
+}
+
+function transformVec3(m: any, v: any) {
+    return vec3(
+        m[0][0]*v[0] + m[0][1]*v[1] + m[0][2]*v[2],
+        m[1][0]*v[0] + m[1][1]*v[1] + m[1][2]*v[2],
+        m[2][0]*v[0] + m[2][1]*v[1] + m[2][2]*v[2]
+    );
 }
