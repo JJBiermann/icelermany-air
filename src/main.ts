@@ -3,7 +3,7 @@ import type { Vec } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse, normalize, cross, subtract, scale, dot } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, printm, vec4, add, inverse, normalize, cross, subtract, scale, dot } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -25,17 +25,17 @@ let right = mat4();
 let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
-let planeX = 0;
-let planeY = 22;
+let planeX = 25;
+let planeY = 0;
 let planeZ = 0;
 let lat = 0;
 let lon = 0;
-const Y = -45;
+let Y = 0;
 let planeXRotation = mat4();
 let planeZRotation = mat4();
 let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
-let planeM = mult(rotateY(Y), planeTranslation);
+let planeM = planeTranslation;
 
 /*
 var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
@@ -221,17 +221,31 @@ async function main() {
     }
     */
 
-
+    let theta = 0;
+    let phi = 0;
+    let speed = Math.PI / (100 * 3.14)
+    Y = 90;
+    let alpha = 0
+    let deltaAlpha = 0
+    let planePos = vec3(0, 25, 0)
+    let r = 23;
+    phi = 0
+    theta = 0;
     function update(dt: number) {
-        let speed = 2;
-        let R = 30;
 
-        lon = speed;
-        lat = speed;
-        let zFactor = Math.abs(Math.sin(Y));
-        let xFactor = Math.abs(Math.cos(Y))
-        planeM = mult(rotateX(-0.5 * (1 - Math.abs(Y / 90))), planeM);
-        planeM = mult(rotateZ(-0.5 * Y / 90), planeM);
+        let x = Math.sin(theta) * Math.cos(phi) * r;
+        let y = Math.cos(theta) * r;
+        let z = Math.sin(theta) * Math.sin(phi) * r;
+
+
+
+        // planeM = mult(rotateX(-0.5 * (1 - Math.abs(Y / 90))), planeM);
+        // planeM = mult(rotateZ(-0.5 * Y / 90), planeM);
+        planeM = translate(x, y, z);
+        // planeM = mult(rotateZ(x), planeM);
+        //printm(planeM);
+        //planeM = mult(rotateZ(phi*0.5), planeM);
+
         //planeM = mult(rotateX(dt * -speed * Math.cos(lon) * Math.cos(lat)), planeM);
         //planeM = mult(rotateZ(dt * -speed * Math.cos(lat) * Math.sin(lon)), planeM);
     }
@@ -267,18 +281,60 @@ async function main() {
 
 
     window.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowLeft") yawInput = -1;
-        if (e.key === "ArrowRight") yawInput = +1;
-        if (e.key === "ArrowUp") pitchInput = +1;
-        if (e.key === "ArrowDown") pitchInput = -1;
+        if (e.key === "ArrowLeft") {
+            deltaAlpha += Math.PI/90;
+            let deltaPhi = 0
+            let deltaTheta = 0
+            deltaPhi = Math.sin(alpha + deltaAlpha) - Math.sin(alpha) 
+            deltaTheta = Math.cos(alpha + deltaAlpha) - Math.cos(alpha) 
+            phi += deltaPhi
+            theta += deltaTheta
+            alpha += deltaAlpha
+            // console.log("alpha: ", alpha);
+            // let deltaPhi = Math.sin(alpha); 
+            // phi += deltaPhi;
+
+            // let deltaTheta = Math.cos(alpha);
+            // theta += deltaTheta;
+        }
+        if (e.key === "ArrowRight") {
+            deltaAlpha -= Math.PI/90;
+            let deltaPhi = 0
+            let deltaTheta = 0
+            deltaPhi = Math.sin(alpha + deltaAlpha) - Math.sin(alpha) 
+            deltaTheta = Math.cos(alpha + deltaAlpha) - Math.cos(alpha) 
+            // deltaTheta = Math.cos(deltaAlpha)
+            phi += deltaPhi
+            theta += deltaTheta
+            alpha += deltaAlpha
+            //phi -= Math.PI/24;
+            // console.log("alpha: ", alpha);
+            // let deltaPhi = Math.sin(alpha); 
+            // phi += deltaPhi;
+
+            // let deltaTheta = Math.cos(alpha);
+            // theta += deltaTheta;
+        }
+
+        /*
+        if (e.key === "ArrowUp") {
+            theta -= Math.PI/24;
+        }
+
+        if (e.key === "ArrowDown") {
+            theta += Math.PI/24
+        }
+        */
     });
 
     window.addEventListener("keyup", (e) => {
-        if (e.key.includes("Arrow")) {
-            yawInput = 0;
-            pitchInput = 0;
+        if (e.key === "ArrowLeft") {
         }
-    });
+
+        if (e.key === "ArrowRight") {
+
+        }
+    })
 }
 
 
