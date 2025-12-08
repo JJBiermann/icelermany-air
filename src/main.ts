@@ -26,13 +26,16 @@ let leftE = mat4();
 let rightE = mat4();
 let rudderM = mat4();
 let planeX = 0;
-let planeY = 30;
+let planeY = 22;
 let planeZ = 0;
+let lat = 0;
+let lon = 0;
+const Y = -45;
 let planeXRotation = mat4();
 let planeZRotation = mat4();
 let planeYRotation = mat4();
 let planeTranslation = translate(planeX, planeY, planeZ);
-let planeM = mult(rotateY(45), planeTranslation);
+let planeM = mult(rotateY(Y), planeTranslation);
 
 /*
 var eye = vec4(0, planeY, planeZ - 30, 1);      // eye is a point
@@ -198,19 +201,7 @@ async function main() {
         rudder.udpateModelMatrix(rudderM);
         */
         planeNode.udpateModelMatrix(planeM);
-        // Spin the sphere slowly around Y and have it little bit down 
-        /*eyeWorld = mult(planeTranslation, eye);
-        lookAtWorld = mult( planeTranslation, lookat);
-        upWorld = mult( planeTranslation,  up);
 
-        view = lookAt(
-            vec3(eyeWorld[0], eyeWorld[1], eyeWorld[2]),
-            vec3(lookAtWorld[0], lookAtWorld[1], lookAtWorld[2]),
-            vec3(upWorld[0], upWorld[1], upWorld[2])
-        );
-        */
-        //sphereM = mult(translate(0, -70, 40), rotateX(change * 20));
-        //sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
         requestAnimationFrame(animate);
@@ -230,86 +221,20 @@ async function main() {
     }
     */
 
-    /*
-    const moveStep = 1; // how much to move per key press
 
-    // After: keep a mutable translation
-    let tx = 0;
-    let ty = 0;
-    let tz = 0;
-    let tilt = 0;
-    let speed = (2 * Math.PI * planeY) / 10;
+    function update(dt: number) {
+        let speed = 2;
+        let R = 30;
 
-    window.addEventListener("keydown", (event: KeyboardEvent) => {
-        let moved = false;
-
-
-
-        switch (event.key) {
-            case "ArrowLeft":
-                // move left in x
-                tilt = Math.min(90, tilt + 10);
-                planeX = Math.min(1, tilt * 1 / 45);
-                planeZRotation = rotateZ(tilt);
-                planeYRotation = rotateY(-tilt / 2)
-                moved = true
-                break;
-            case "ArrowRight":
-                tilt = Math.max(-90, tilt - 10);
-                planeX = Math.max(-1, tilt * 1 / 45);
-                planeZRotation = rotateZ(tilt);
-                planeYRotation = rotateY(-tilt / 2)
-                moved = true
-                break;
-            case "ArrowUp":
-                ty += moveStep * 2; // move up in y
-                moved = true
-                break;
-            case "ArrowDown":
-                ty -= moveStep * 2; // move down in y
-                moved = true
-                break;
-        }
-
-        if (moved) {
-            //planeXRotation = rotateX(ty);
-            planeXRotation = mat4();
-            //planeZRotation = rotateZ(tx);
-            planeTranslation = translate(planeX, planeY, planeZ);
-
-            planeM = mult(planeTranslation, mult(planeYRotation, mult(planeZRotation, planeXRotation)));
-
-        }
-    });
-    */
-
-    let planePos;
-    let planeDir = vec3(0, 0, 1);  // Forward direction in world space
-    let yaw = 0;   // rotate left/right
-    let pitch = 0; // nose up/down
-    let roll = 0;  // tilting the wings
-    let speed = 10; // units per second
-
-    const moveStep = 1; // how much to move per key press
-
-    // After: keep a mutable translation
-    // Globals you can tweak:
-let lat = 0;                     // radians
-let lon = 0;
-let latSpeed = 1;              // radians per second
-let lonSpeed = 1;
-
-const GlobeRadius = 20;
-
-// Output:
-let planeModelMatrix = mat4();
-
-
-function update(dt: number) {
-    speed = 50;
-    planeM = mult(rotateX(dt * -speed), planeM);
-    planeM = mult(rotateZ(dt * -speed), planeM);
-}
+        lon = speed;
+        lat = speed;
+        let zFactor = Math.abs(Math.sin(Y));
+        let xFactor = Math.abs(Math.cos(Y))
+        planeM = mult(rotateX(-0.5 * (1 - Math.abs(Y / 90))), planeM);
+        planeM = mult(rotateZ(-0.5 * Y / 90), planeM);
+        //planeM = mult(rotateX(dt * -speed * Math.cos(lon) * Math.cos(lat)), planeM);
+        //planeM = mult(rotateZ(dt * -speed * Math.cos(lat) * Math.sin(lon)), planeM);
+    }
 
 
     /*
@@ -453,13 +378,13 @@ dt = timestep
 R = sphere radius
 */
 
-function moveOnSphere(P: Vec, F: Vec , R: number, dt: number, speed: number) : Vec{
+function moveOnSphere(P: Vec, F: Vec, R: number, dt: number, speed: number): Vec {
     const N = normalize(P);                   // sphere normal
     let T = subtract(F, scale(dot(F, N), N)); // tangent direction
     T = normalize(T);
-    
+
     let Pnew = add(P, scale(speed * dt, T));  // move slightly
     Pnew = scale(R, normalize(Pnew));         // reproject to sphere
-    console.log("Pnew!", Pnew) 
+    console.log("Pnew!", Pnew)
     return Pnew;
 }
