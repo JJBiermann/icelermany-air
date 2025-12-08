@@ -32,10 +32,12 @@ export class Renderer {
     private positionBufferLayout!: GPUVertexBufferLayout;
     private colorBufferLayout!: GPUVertexBufferLayout;
     private normalBufferLayout!: GPUVertexBufferLayout;
+    private uvBufferLayout!: GPUVertexBufferLayout;
 
     private config!: RendererConfig;
     private lightTheta = 0;
     private lightDir: [number, number, number, number] = [0.0, -0.5, 1.0, 0.0];
+    private lightSpinEnabled = true;
 
     constructor(config: RendererConfig) {
         this.config = {
@@ -84,6 +86,15 @@ export class Renderer {
         this.createBuffers();
         this.createBindGroups();
         this.createTextures();
+    }
+
+    public setLightSpinEnabled(enabled: boolean): void {
+        this.lightSpinEnabled = enabled;
+    }
+
+    public toggleLightSpin(): boolean {
+        this.lightSpinEnabled = !this.lightSpinEnabled;
+        return this.lightSpinEnabled;
     }
 
     public updatePositionBuffer(inBuffer: number[]): void {
@@ -175,11 +186,13 @@ export class Renderer {
     }
 
     public renderHierarchy(rootNode: RenderNode, model: Mat, view: Mat, proj: Mat) {
-        // Rotate light on a horizontal ring around Y (no tilt); speed ~globe
-        this.lightTheta += 0.002;
-        const lx = Math.cos(this.lightTheta);
-        const lz = Math.sin(this.lightTheta);
-        this.lightDir = [lx, 0.0, lz, 0.0];
+        // Rotate light on a horizontal ring around Y (no tilt); can be paused via toggle
+        if (this.lightSpinEnabled) {
+            this.lightTheta += 0.002;
+            const lx = Math.cos(this.lightTheta);
+            const lz = Math.sin(this.lightTheta);
+            this.lightDir = [lx, 0.0, lz, 0.0];
+        }
 
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
@@ -240,6 +253,7 @@ export class Renderer {
         pass.setVertexBuffer(0, node.positionBuffer);
         pass.setVertexBuffer(1, node.colorBuffer);
         pass.setVertexBuffer(2, node.normalBuffer);
+        pass.setVertexBuffer(3, node.uvBuffer);
         pass.setIndexBuffer(node.indexBuffer, 'uint32');
 
         pass.drawIndexed(node.indices.length);
@@ -304,7 +318,7 @@ export class Renderer {
             vertex: {
                 module: this.wgsl,
                 entryPoint: 'main_vs',
-                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout]//, this.colorBufferLayout, this.normalBufferLayout],
+                buffers: [this.positionBufferLayout, this.colorBufferLayout, this.normalBufferLayout, this.uvBufferLayout],
             },
             fragment: {
                 module: this.wgsl,
@@ -350,7 +364,16 @@ export class Renderer {
                 offset: 0,
                 shaderLocation: 2, // normal @location(2)
             }]
-        }
+        };
+
+        this.uvBufferLayout = {
+            arrayStride: 8, // 2 floats
+            attributes: [{
+                format: 'float32x2',
+                offset: 0,
+                shaderLocation: 3, // uv @location(3)
+            }]
+        };
     }
 
     private createBuffers() {
@@ -385,12 +408,36 @@ export class Renderer {
     }
 
     private createBindGroups() {
+        // Fallback bind group; per-node bind groups will override during rendering
+        const fallbackSampler = this.device.createSampler();
+        const fallbackTexture = this.device.createTexture({
+            size: [1, 1, 1],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        this.device.queue.writeTexture(
+            { texture: fallbackTexture },
+            new Uint8Array([255, 255, 255, 255]),
+            { bytesPerRow: 4 },
+            [1, 1, 1]
+        );
+
         this.bindGroup = this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
-            entries: [{
-                binding: 0,
-                resource: { buffer: this.uniformBuffer }
-            }]
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this.uniformBuffer }
+                },
+                {
+                    binding: 1,
+                    resource: fallbackSampler
+                },
+                {
+                    binding: 2,
+                    resource: fallbackTexture.createView()
+                }
+            ]
         });
     }
 

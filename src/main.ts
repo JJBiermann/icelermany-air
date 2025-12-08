@@ -2,7 +2,7 @@ import { sizeof, type Mat } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add } from "./utils/MV";
+import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, vec4, add, inverse } from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -58,25 +58,66 @@ async function main() {
 
     await renderer.init();
 
-    // Create identity matrices for model, view, and projection
-    const identity = [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    ];
+    const device = renderer.getDevice();
 
-    const cubeVertices = [
-        -0.25, 0, -0.25,  //left back down
-        -0.25, 0, 0.25,   //right back down    
-        0.25, 0, -0.25,   //left front down    
-        0.25, 0, 0.25,   //right front down    
-    ]
+    const toggleLightBtn = document.getElementById('toggle-circle-light') as HTMLButtonElement | null;
+    let lightSpinEnabled = true;
+    toggleLightBtn?.addEventListener('click', () => {
+        lightSpinEnabled = renderer.toggleLightSpin();
+        if (toggleLightBtn) {
+            toggleLightBtn.textContent = lightSpinEnabled ? 'Circle light on (spinning)' : 'Circle light off (paused)';
+        }
+    });
 
-    const indices = [
-        0, 1, 3, // left back -> right back -> right front
-        3, 2, 0, // right front -> left front -> back left
-    ]
+    async function loadTexture(url: string): Promise<GPUTexture> {
+        const res = await fetch(url);
+        if (!res.ok) {
+            console.warn(`Failed to load texture ${url}: ${res.status}`);
+            throw new Error(`Texture load failed: ${url}`);
+        }
+        const blob = await res.blob();
+        const imageBitmap = await createImageBitmap(blob);
+        const texture = device.createTexture({
+            size: [imageBitmap.width, imageBitmap.height, 1],
+            format: 'rgba8unorm',
+            // RenderAttachment is required by Dawn for copyExternalImageToTexture on some platforms
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        device.queue.copyExternalImageToTexture({ source: imageBitmap }, { texture }, [imageBitmap.width, imageBitmap.height]);
+        console.log(`Loaded texture ${url} (${imageBitmap.width}x${imageBitmap.height})`);
+        return texture;
+    }
+
+    const sampler = device.createSampler({
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'linear',
+        addressModeU: 'repeat',
+        addressModeV: 'clamp-to-edge',
+    });
+
+    // 1x1 white fallback texture for meshes without textures
+    const whiteTexture = device.createTexture({
+        size: [1, 1, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+        { texture: whiteTexture },
+        new Uint8Array([255, 255, 255, 255]),
+        { bytesPerRow: 4 },
+        [1, 1, 1]
+    );
+    const whiteView = whiteTexture.createView();
+
+    // Texture for earth; file should be placed at public/textures/earth.jpg
+    let earthView = whiteView;
+    try {
+        const earthTexture = await loadTexture('/textures/earth.jpg');
+        earthView = earthTexture.createView();
+    } catch (err) {
+        console.warn('Falling back to white texture for earth because load failed', err);
+    }
 
     // NDC coordinates in WebGPU are in [-1,1]x[-1,1]x[0,1]
 
@@ -104,17 +145,16 @@ async function main() {
     // create the sphere with radius 15, 32 stacks and 64 slices
     const sphere = generateSphere(20, 32, 64);
 
-    const dev = renderer.getDevice();
     const pipeline = renderer.getPipeline();
 
 
     console.log(planeData!.colors)
-    let rightElevator: RenderNode = new RenderNode(rightE, Array.from(rightElevatorData!.vertices), Array.from(rightElevatorData!.indices), Array.from(rightElevatorData!.normals), Array.from(rightElevatorData!.colors), null, null, dev, pipeline);
-    let leftElevator: RenderNode = new RenderNode(leftE, Array.from(leftElevatorData!.vertices), Array.from(leftElevatorData!.indices), Array.from(leftElevatorData!.normals), Array.from(leftElevatorData!.colors), rightElevator, null, dev, pipeline);
-    let rightAileron: RenderNode = new RenderNode(left, Array.from(rightAileronData!.vertices), Array.from(rightAileronData!.indices), Array.from(rightAileronData!.normals), Array.from(rightAileronData!.colors), leftElevator, null, dev, pipeline);
-    let leftAileron: RenderNode = new RenderNode(right, Array.from(leftAileronData!.vertices), Array.from(leftAileronData!.indices), Array.from(leftAileronData!.normals), Array.from(leftAileronData!.colors), rightAileron, null, dev, pipeline);
-    let rudder: RenderNode = new RenderNode(rudderM, Array.from(rudderData!.vertices), Array.from(rudderData!.indices), Array.from(rudderData!.normals), Array.from(rudderData!.colors), leftAileron, null, dev, pipeline);
-    let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, rudder, dev, pipeline);
+    let rightElevator: RenderNode = new RenderNode(rightE, Array.from(rightElevatorData!.vertices), Array.from(rightElevatorData!.indices), Array.from(rightElevatorData!.normals), Array.from(rightElevatorData!.colors), null, null, null, device, pipeline, sampler, whiteView);
+    let leftElevator: RenderNode = new RenderNode(leftE, Array.from(leftElevatorData!.vertices), Array.from(leftElevatorData!.indices), Array.from(leftElevatorData!.normals), Array.from(leftElevatorData!.colors), null, rightElevator, null, device, pipeline, sampler, whiteView);
+    let rightAileron: RenderNode = new RenderNode(left, Array.from(rightAileronData!.vertices), Array.from(rightAileronData!.indices), Array.from(rightAileronData!.normals), Array.from(rightAileronData!.colors), null, leftElevator, null, device, pipeline, sampler, whiteView);
+    let leftAileron: RenderNode = new RenderNode(right, Array.from(leftAileronData!.vertices), Array.from(leftAileronData!.indices), Array.from(leftAileronData!.normals), Array.from(leftAileronData!.colors), null, rightAileron, null, device, pipeline, sampler, whiteView);
+    let rudder: RenderNode = new RenderNode(rudderM, Array.from(rudderData!.vertices), Array.from(rudderData!.indices), Array.from(rudderData!.normals), Array.from(rudderData!.colors), null, leftAileron, null, device, pipeline, sampler, whiteView);
+    let planeNode: RenderNode = new RenderNode(planeM, Array.from(planeData!.vertices), Array.from(planeData!.indices), Array.from(planeData!.normals), Array.from(planeData!.colors), null, null, rudder, device, pipeline, sampler, whiteView);
     // Sphere is a sibling of the plane; terminate its sibling to avoid cycles
     // Move sphere below the plane (e.g., y = -20) so plane flies above it
     let sphereNode: RenderNode = new RenderNode(mat4(), Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), null, null, dev, pipeline);
@@ -165,8 +205,9 @@ async function main() {
         //sphereNode.udpateModelMatrix(sphereM);
         renderer.renderHierarchy(planeNode, mat4(), view, projection);
 
-        requestAnimationFrame(update)
+        requestAnimationFrame(update);
     }
+    requestAnimationFrame(update);
 
 
     /*
@@ -358,6 +399,7 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
     const positions: number[] = []; // vec4 (x,y,z,1)
     const normals: number[] = [];   // vec4 (nx,ny,nz,0)
     const colors: number[] = [];    // vec4 (r,g,b,1)
+    const uvs: number[] = [];
     const indices: number[] = [];
 
     for (let stack = 0; stack <= stacks; stack++) {
@@ -386,11 +428,13 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
             // Normal vec4 (unit length; w=0)
             normals.push(x, y, z, 0.0);
 
-            // Simple color gradient based on latitude/longitude
-            const r = 0.5 * (x + 1.0);
-            const g = 0.5 * (y + 1.0);
-            const b = 0.5 * (z + 1.0);
-            colors.push(r, g, b, 1.0);
+            // Use neutral white so texture colors stay untainted
+            colors.push(1.0, 1.0, 1.0, 1.0);
+
+            // UVs: longitude -> u, latitude -> v
+            const u = phi / (2 * Math.PI);
+            const v = 1.0 - (theta / Math.PI);
+            uvs.push(u, v);
         }
     }
 
@@ -407,7 +451,7 @@ function generateSphere(radius: number = 10, stacks: number = 32, slices: number
     }
 
     // Return in the order that matches RenderNode ctor: vertices, indices, normals, colors
-    return { positions, indices, normals, colors };
+    return { positions, indices, normals, colors, uvs };
 }
 
 function transformVec3(m: any, v: any) {
