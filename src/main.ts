@@ -154,7 +154,7 @@ async function main() {
     let sphereM = mat4();
     // New matrix to track ONLY the earth's rotation (flying), not the plane's tilt
     let earthRotationM = mat4();
-    
+
     let sphereNode: RenderNode = new RenderNode(sphereM, Array.from(sphere.positions), Array.from(sphere.indices), Array.from(sphere.normals), Array.from(sphere.colors), Array.from(sphere.uvs), null, null, device, pipeline, sampler, earthView);
     planeNode.sibling = sphereNode;
 
@@ -205,7 +205,7 @@ async function main() {
     let lightDir: [number, number, number, number] = [0.0, 1.0, 0.0, 0.0];
 
     const planeScale = 0.03;
-    const followDistance = -0.5; // how far behind the plane
+    const followDistance = -0.3; // how far behind the plane
     const followHeight = 0.2;    // how far above the plane
     const glideBase = 10;      // units/sec at max pitch (tune this)
     const maxPitchDeg = 30;   // matches your clamp
@@ -256,7 +256,7 @@ async function main() {
         } else if (rightPressed) {
             currentRudderAngle = Math.max(-maxDeflection, currentRudderAngle - surfaceSpeed);
         } else {
-             if (currentRudderAngle > 0) currentRudderAngle = Math.max(0, currentRudderAngle - returnSpeed);
+            if (currentRudderAngle > 0) currentRudderAngle = Math.max(0, currentRudderAngle - returnSpeed);
             else if (currentRudderAngle < 0) currentRudderAngle = Math.min(0, currentRudderAngle + returnSpeed);
         }
 
@@ -282,35 +282,43 @@ async function main() {
             }
         }
 
-        // Update ONLY the earth rotation based on speed (flying forward)
-        // We accumulate this rotation over time.
+        /// === ADD TURNING LOGIC HERE ===
+        // Calculate turning based on bank angle (zAngle)
+        const TURN_GAIN = 200; // Tune this for turn responsiveness
+        const rollRad = zAngle * Math.PI / 180;
+        const turnRate = TURN_GAIN * speed * Math.sin(rollRad);
+
+        // Apply the turn (yaw rotation) - this makes the plane actually turn
+        earthRotationM = mult(rotateY(-turnRate * dt), earthRotationM);
+
+        // Then apply forward motion
         earthRotationM = mult(rotateX(speed), earthRotationM);
 
-        // Now calculate the final sphereM for rendering:
-        // 1. Apply the accumulated earth rotation (flying)
-        // 2. Apply the plane's tilt (banking) - this rotates the whole world around the plane
-        // Note: The order matters. We want the earth to spin, AND the whole system to tilt.
-        
-        // Apply tilt (banking) to the ALREADY rotated earth
+        // Calculate visual banking/pitching effects
+        xSpeed = (xAngle / 6.0) * speed;
+        zSpeed = (zAngle / 6.0) * speed;
+
+        // Apply visual tilt to the earth
         sphereM = mult(
-            rotateX(-xSpeed), 
+            rotateX(-xSpeed),
             mult(rotateZ(-zSpeed), earthRotationM)
         );
+
 
         // LIGHT ATTACHED TO GROUND:
         // We use earthRotationM (pure earth spin) to rotate the light.
         // This means the light is fixed to a continent.
         // We do NOT include the tilt (xSpeed/zSpeed) in the light calculation, 
         // so the sun doesn't wobble when you bank.
-        const sunFixedToEarth = vec4(0.2, 1.0, 0.2, 0.0); 
+        const sunFixedToEarth = vec4(0.2, 1.0, 0.2, 0.0);
         const worldLightDir = mult(sphereM, sunFixedToEarth);
-        
+
         // Normalize
-        const len = Math.sqrt(worldLightDir[0]*worldLightDir[0] + worldLightDir[1]*worldLightDir[1] + worldLightDir[2]*worldLightDir[2]);
+        const len = Math.sqrt(worldLightDir[0] * worldLightDir[0] + worldLightDir[1] * worldLightDir[1] + worldLightDir[2] * worldLightDir[2]);
         lightDir = [
-            worldLightDir[0]/len, 
-            worldLightDir[1]/len, 
-            worldLightDir[2]/len, 
+            worldLightDir[0] / len,
+            worldLightDir[1] / len,
+            worldLightDir[2] / len,
             0.0
         ];
 
@@ -329,7 +337,7 @@ async function main() {
         const planeRotation =
             mult(rotateX(90),
                 mult(rotateY(yAngle),
-                    rotateZ(-zAngle)));
+                    rotateZ(0)));
 
         // rotate camera offset into world space
         const offset4 = mult(planeRotation, vec4(localCamOffset[0], localCamOffset[1], localCamOffset[2], 0));
@@ -418,21 +426,21 @@ async function main() {
             sPressed = false;
         }
         if (e.key === "ArrowLeft") {
-             console.log("left released!");
-             leftPressed = false;
+            console.log("left released!");
+            leftPressed = false;
         }
 
         if (e.key === "ArrowRight") {
-             console.log("right released!");
-             rightPressed = false;
+            console.log("right released!");
+            rightPressed = false;
         }
         if (e.key === "ArrowUp") {
-             console.log("up released!");
-             upPressed = false;
+            console.log("up released!");
+            upPressed = false;
         }
         if (e.key === "ArrowDown") {
-             console.log("down released!");
-             downPressed = false;
+            console.log("down released!");
+            downPressed = false;
         }
     })
 }
@@ -442,10 +450,10 @@ function tiltAileronsAndElevators(aileronAngle: number, elevatorAngle: number): 
     // Left Aileron: Up is negative rotation
     // Right Aileron: Down is positive rotation (opposite of left)
     let leftAileronTilt = mult(translate(leftAileronTransform[0], -leftAileronTransform[1], leftAileronTransform[2]), mult(rotateX(aileronAngle), translate(-leftAileronTransform[0], leftAileronTransform[1], -leftAileronTransform[2])))
-    
+
     // Right aileron moves opposite to left
     let rightAileronTilt = mult(translate(rightAileronTransform[0], -rightAileronTransform[1], rightAileronTransform[2]), mult(rotateX(-aileronAngle), translate(-rightAileronTransform[0], rightAileronTransform[1], -rightAileronTransform[2])))
-    
+
     let leftElevatorTilt = mult(translate(leftElevatorTransform[0], -leftElevatorTransform[1], leftElevatorTransform[2]), mult(rotateX(elevatorAngle), translate(-leftElevatorTransform[0], leftElevatorTransform[1], -leftElevatorTransform[2])))
     let rightElevatorTilt = mult(translate(rightElevatorTransform[0], -rightElevatorTransform[1], rightElevatorTransform[2]), mult(rotateX(elevatorAngle), translate(-rightElevatorTransform[0], rightElevatorTransform[1], -rightElevatorTransform[2])))
     return {
