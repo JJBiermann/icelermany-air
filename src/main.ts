@@ -379,7 +379,7 @@ async function main() {
             leftPressed = true;
             yAngle = Math.max(-45, yAngle - (4.5 / steps));
             zAngle = Math.min(60, zAngle + (6 / steps));
-            //zSpeed = zAngle / 6.0 * speed;
+            zSpeed = zAngle / 6.0 * speed;
 
         }
         if (e.key === "ArrowRight") {
@@ -387,7 +387,7 @@ async function main() {
             rightPressed = true;
             yAngle = Math.min(45, yAngle + (4.5 / steps));
             zAngle = Math.max(-60, zAngle - (6 / steps));
-            //zSpeed = zAngle / 6.0 * speed;
+            zSpeed = zAngle / 6.0 * speed;
         }
         if (e.key === "ArrowUp") {
             console.log("up pressed!");
