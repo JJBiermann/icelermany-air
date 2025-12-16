@@ -207,7 +207,7 @@ async function main() {
     const planeScale = 0.03;
     const followDistance = -0.3; // how far behind the plane
     const followHeight = 0.2;    // how far above the plane
-    const glideBase = 10;      // units/sec at max pitch (tune this)
+    const glideBase = 2;      // units/sec at max pitch (tune this)
     const maxPitchDeg = 30;   // matches your clamp
 
 
