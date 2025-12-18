@@ -1,9 +1,9 @@
-import { sizeof, type Mat } from "./utils/MV";
+import  type { Mat } from "./utils/MV";
 import type { Vec } from "./utils/MV";
 import shader from "./shader/shaders.wgsl";
 import { readOBJFile } from "./utils/OBJParser.ts";
 import { Renderer } from "./renderer.ts";
-import { scalem, flatten, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, rotate, printm, vec4, add, inverse, normalize, cross, subtract, scale, dot } from "./utils/MV";
+import { scalem, lookAt, vec3, perspective, mult, translate, rotateX, mat4, rotateY, rotateZ, vec4, add} from "./utils/MV";
 import { RenderNode } from "./node.ts";
 
 
@@ -367,8 +367,6 @@ async function main() {
     let wPressed = false;
     let sPressed = false;
     let steps = 10
-    let MaxAileronAngle = 90;
-    let planePitch = 0;
 
     window.addEventListener("keydown", (e) => {
         // Prevent scrolling with arrow keys

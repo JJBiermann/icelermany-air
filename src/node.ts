@@ -1,4 +1,4 @@
-import { mat4, mult, sizeof } from "./utils/MV";
+import { sizeof } from "./utils/MV";
 import type { Mat } from "./utils/MV";
 
 export class RenderNode {
