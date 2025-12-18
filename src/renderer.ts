@@ -229,7 +229,7 @@ export class Renderer {
     // this function will be called inside of the "traverse()" function of the corresponding node.
     public renderNode(node: RenderNode, pass: GPURenderPassEncoder, model: Mat,  view: Mat, proj: Mat) {
         if (node == null) {
-            throw new Error("WTF is happening lol");
+            throw new Error("This should not happen.");
         }
         let worldModel = mult(model, node.modelM);
 

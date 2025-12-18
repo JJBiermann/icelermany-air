@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import rawPlugin from 'vite-raw-plugin';
 
 export default defineConfig({
-  base: '',
+  base: '~s243378/cg-project/',
   // Configure multi-page app
   build: {
     rollupOptions: {

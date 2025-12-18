@@ -102,7 +102,7 @@ async function main() {
     // Texture for earth; file should be placed at public/textures/earth.jpg
     let earthView = whiteView;
     try {
-        const earthTexture = await loadTexture('/textures/earth.jpg');
+        const earthTexture = await loadTexture(`${import.meta.env.BASE_URL}/textures/earth.jpg`);
         earthView = earthTexture.createView();
     } catch (err) {
         console.warn('Falling back to white texture for earth because load failed', err);
@@ -127,12 +127,12 @@ async function main() {
     onResize(); // Initial call to set full screen
 
     // Load OBJ file
-    const planeData = await readOBJFile("../../../blender-models/plane-parts/planebody.obj");
-    const leftAileronData = await readOBJFile("../../../blender-models/plane-parts/leftaileron.obj");
-    const rightAileronData = await readOBJFile("../../../blender-models/plane-parts/rightaileron.obj");
-    const leftElevatorData = await readOBJFile("../../../blender-models/plane-parts/leftelevator.obj");
-    const rightElevatorData = await readOBJFile("../../../blender-models/plane-parts/rightelevator.obj");
-    const rudderData = await readOBJFile("../../../blender-models/plane-parts/rudder.obj");
+    const planeData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/planebody.obj`);
+    const leftAileronData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/leftaileron.obj`);
+    const rightAileronData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/rightaileron.obj`);
+    const leftElevatorData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/leftelevator.obj`);
+    const rightElevatorData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/rightelevator.obj`);
+    const rudderData = await readOBJFile(`${import.meta.env.BASE_URL}/blender-models/plane-parts/rudder.obj`);
 
 
     // create the sphere with radius 15, 32 stacks and 64 slices
